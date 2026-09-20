@@ -48,6 +48,20 @@ export const Gitea = Schema.Struct({
   apiUrl: Schema.String.check(Schema.isPattern(/^https?:\/\/[^\s]+$/)),
   tokenFile: AbsolutePath,
 });
+const PostgresName = Schema.String.check(
+  Schema.isPattern(/^[a-zA-Z_][a-zA-Z0-9_-]*$/),
+).pipe(Schema.brand("PostgresName"));
+export const Postgres = Schema.Struct({
+  type: Schema.Literal("postgres"),
+  hostname: Schema.String.check(
+    Schema.isPattern(/^[a-zA-Z0-9][a-zA-Z0-9.-]*$/),
+  ),
+  port: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 65535 })),
+  database: PostgresName,
+  username: PostgresName,
+  passwordFile: AbsolutePath,
+  output: FileName,
+});
 export const Restic = Schema.Struct({
   type: Schema.Literal("restic"),
   repository: AbsolutePath,
@@ -67,7 +81,7 @@ export const Job = Schema.Struct({
   version: Schema.Literal(1),
   name: JobName,
   host: Schema.NonEmptyString,
-  source: Schema.Union([Sqlite, Gitea]),
+  source: Schema.Union([Sqlite, Gitea, Postgres]),
   backupDrive: Schema.Struct({
     sentinelFile: AbsolutePath,
     driveSerial: Schema.NonEmptyString,

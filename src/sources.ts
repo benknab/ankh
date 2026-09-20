@@ -43,6 +43,39 @@ const stage = Effect.fn("Sources.stage")(function* (job: Job) {
     return directory;
   }
 
+  if (source.type === "postgres") {
+    yield* fs.remove(directory, { recursive: true, force: true });
+    yield* privateDirectory(directory);
+    const output = path.join(directory, source.output);
+    const password = (yield* fs.readFileString(source.passwordFile)).replace(
+      /\r?\n$/,
+      "",
+    );
+    if (password.length === 0 || password.includes("\0")) {
+      return yield* new BackupError({
+        message: "Invalid PostgreSQL password file",
+      });
+    }
+    yield* commands.run("pg_dump", [
+      "--no-password",
+      "--format=custom",
+      "--file",
+      output,
+    ], {
+      env: {
+        PGHOST: source.hostname,
+        PGPORT: String(source.port),
+        PGDATABASE: source.database,
+        PGUSER: source.username,
+        PGPASSWORD: password,
+        PGCONNECT_TIMEOUT: "30",
+      },
+    });
+    // Read every archive entry without collecting the generated SQL in memory.
+    yield* commands.run("pg_restore", ["--file=/dev/null", output]);
+    return directory;
+  }
+
   const token = (yield* fs.readFileString(source.tokenFile)).trim();
   yield* Schema.decodeUnknownEffect(Schema.NonEmptyString)(token);
   const client = (yield* HttpClient.HttpClient).pipe(HttpClient.filterStatusOk);

@@ -25,6 +25,14 @@ RUN apt-get update \
     && rm /tmp/proton-drive \
     && rm -rf /var/lib/apt/lists/*
 
+RUN wget --quiet --output-document=/usr/share/keyrings/postgresql.asc \
+      https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+    && . /etc/os-release \
+    && printf 'deb [signed-by=/usr/share/keyrings/postgresql.asc] https://apt.postgresql.org/pub/repos/apt %s-pgdg main\n' "$VERSION_CODENAME" > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install --yes --no-install-recommends postgresql-client-15 \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY deno.json deno.lock ./

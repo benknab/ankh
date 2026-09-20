@@ -12,7 +12,8 @@ uploads.
 - `src/commands.ts`: scoped Effect child processes and exit-code checks.
 - `src/storage.ts`: Effect filesystem services, drive identity checks, and
   locks.
-- `src/sources.ts`: online SQLite snapshots and Gitea Git/LFS mirrors.
+- `src/sources.ts`: online SQLite snapshots, PostgreSQL dumps, and Gitea Git/LFS
+  mirrors.
 - `src/restic.ts`: local encrypted snapshots and retention.
 - `src/outbox.ts`: durable archive publication and Effect Queue/Stream delivery.
 - `src/proton.ts`: official Proton Drive CLI adapter.
@@ -24,9 +25,9 @@ uploads.
 - `main.ts`: Effect CLI and runtime entry point.
 
 All application infrastructure uses Effect libraries. External tools handle
-SQLite online backup, Git/LFS, Restic, tar/zstd, GPG/pass, and Proton's
-protocol. `AGENTS.md` explains how to use the Effect skill bundled in
-`node_modules/effect/`.
+SQLite online backup, PostgreSQL dump/restore, Git/LFS, Restic, tar/zstd,
+GPG/pass, and Proton's protocol. `AGENTS.md` explains how to use the Effect
+skill bundled in `node_modules/effect/`.
 
 ## Development
 
@@ -58,6 +59,28 @@ docker run --rm --read-only --cap-drop ALL --cap-add DAC_OVERRIDE \
 Tests exercise real SQLite, Restic, tar/zstd, and filesystem operations; a test
 Proton service simulates upload failure and recovery. A real Proton upload and
 download still require login.
+
+The PostgreSQL integration test also needs `BACKUP_POSTGRES_INTEGRATION=1` and a
+fresh PostgreSQL 15 server reachable as `postgres-test` on the test container's
+Docker network, with user `postgres` and password `integration-test-only`. Use a
+disposable server with a tmpfs data directory. The test creates `source_test`
+and `restore_test`, stages a real dump, restores and queries it, then checks
+that wrong credentials fail without exposing the password.
+
+## PostgreSQL sources
+
+Use source type `postgres` with `hostname`, `port`, `database`, `username`,
+`passwordFile`, and `output` (see `../server/example-postgres/backup.job.json`). The
+password file contains the password with an optional trailing newline. The
+runner passes connection details through the dump process environment, never
+command arguments. It creates a consistent custom-format dump while the app runs
+and checks every archive entry with `pg_restore --file=/dev/null`. This checks
+readability, not whether a database restore succeeds; test restores separately.
+
+The image installs PostgreSQL 15 clients from the signed PostgreSQL apt
+repository to match Example PostgreSQL's server. Revisit the client major version before
+upgrading that server. Dumps include database objects and data, not cluster
+roles or app secrets. Keep recovery copies of those separately.
 
 ## Setup
 
@@ -146,9 +169,12 @@ or backs up unrelated application data. Gitea protects Git history and fetched L
 objects, not Gitea users, issues, settings, or its database. Existing cached
 mirrors remain available when a repository disappears from the API.
 
-Each app's `backup` service runs `backup-runner schedule` continuously. Effect's
-`Schedule.cron` triggers the job daily at **03:30 UTC**, without a daylight-saving offset. A normal `docker compose up -d` starts the
-scheduler alongside the app. To start only the backup service after setup:
+Each enabled app's `backup` service runs `backup-runner schedule` continuously.
+Effect's `Schedule.cron` triggers the job daily at **03:30 UTC**,
+without a daylight-saving offset. A normal `docker compose up -d`
+starts the scheduler alongside the app, except for opt-in profiles such as
+Example PostgreSQL's `backup` profile. Follow that app's restore checks before enabling it.
+To start only the backup service after setup:
 
 ```sh
 docker compose up -d --no-deps backup
