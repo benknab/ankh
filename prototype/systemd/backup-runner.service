@@ -1,0 +1,15 @@
+[Unit]
+Description=Back up opted-in Deployment services
+RequiresMountsFor=/mnt/backup-drive
+After=docker.service mnt-backup\x2ddrive.mount
+Wants=docker.service
+
+[Service]
+Type=oneshot
+User=example-host
+Group=example-host
+WorkingDirectory=/home/backup/deployment
+ExecStart=/home/backup/deployment/server/backup-runner/run-all.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

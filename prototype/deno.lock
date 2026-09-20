@@ -1,0 +1,29 @@
+{
+  "version": "5",
+  "specifiers": {
+    "jsr:@std/assert@1.0.15": "1.0.15",
+    "jsr:@std/internal@^1.0.12": "1.0.13",
+    "npm:better-result@3.0.0": "3.0.0"
+  },
+  "jsr": {
+    "@std/assert@1.0.15": {
+      "integrity": "d64018e951dbdfab9777335ecdb000c0b4e3df036984083be219ce5941e4703b",
+      "dependencies": [
+        "jsr:@std/internal"
+      ]
+    },
+    "@std/internal@1.0.13": {
+      "integrity": "2f9546691d4ac2d32859c82dff284aaeac980ddeca38430d07941e7e288725c0"
+    }
+  },
+  "npm": {
+    "better-result@3.0.0": {
+      "integrity": "sha512-6aAtXzewlQYw6BrlKL164xDAsVJ+z2Au3Bwik27tXQBNs3OP3MDVDHznb8ovbqA3jtYxTWbchBikb/K3MjevZA=="
+    }
+  },
+  "workspace": {
+    "dependencies": [
+      "npm:better-result@3.0.0"
+    ]
+  }
+}

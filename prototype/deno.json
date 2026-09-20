@@ -1,0 +1,14 @@
+{
+  "imports": {
+    "better-result": "npm:better-result@3.0.0"
+  },
+  "compilerOptions": {
+    "exactOptionalPropertyTypes": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "strict": true
+  }
+}
