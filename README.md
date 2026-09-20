@@ -1,0 +1,164 @@
+# Backup runner
+
+A standalone Deno project built with **Effect 4.0.0-rc.116**. Each opted-in app
+owns its Compose backup service, source mounts, and job file. The runner stages
+and checks the source once, then attempts every configured destination. A failed
+destination fails the job while preserving successful copies and pending
+uploads.
+
+## Structure
+
+- `src/model.ts`: Schema validation, branded paths/names, and typed requests.
+- `src/commands.ts`: scoped Effect child processes and exit-code checks.
+- `src/storage.ts`: Effect filesystem services, drive identity checks, and
+  locks.
+- `src/sources.ts`: online SQLite snapshots and Gitea Git/LFS mirrors.
+- `src/restic.ts`: local encrypted snapshots and retention.
+- `src/outbox.ts`: durable archive publication and Effect Queue/Stream delivery.
+- `src/proton.ts`: official Proton Drive CLI adapter.
+- `src/retention.ts`: UTC calendar retention over parsed snapshots.
+- `src/destinations.ts`, `src/runner.ts`: destination dispatch and job
+  execution.
+- `src/auth.ts`, `src/host.ts`: login and sequential opted-in stack execution.
+- `main.ts`: Effect CLI and runtime entry point.
+
+All application infrastructure uses Effect libraries. External tools handle
+SQLite online backup, Git/LFS, Restic, tar/zstd, GPG/pass, and Proton's
+protocol. `AGENTS.md` explains how to use the Effect skill bundled in
+`node_modules/effect/`.
+
+## Development
+
+Run these commands from `backup-runner/`:
+
+```sh
+deno install --frozen
+deno task fmt
+deno task check
+deno task test
+docker build -t backup-runner:local .
+```
+
+Unit tests use service layers and do not need credentials. Integration tests
+need the external tools in the image:
+
+```sh
+docker run --rm --read-only --cap-drop ALL --cap-add DAC_OVERRIDE \
+  --security-opt no-new-privileges:true \
+  --tmpfs /tmp:size=128m,mode=1777 --tmpfs /staging:size=64m,mode=0700 \
+  --tmpfs /proton:size=32m,mode=0700 \
+  -e BACKUP_INTEGRATION=1 \
+  -v "$PWD/integration_test.ts:/app/integration_test.ts:ro" \
+  -v "$PWD/test-support.ts:/app/test-support.ts:ro" \
+  --entrypoint deno backup-runner:local \
+  test --allow-all --no-check /app/integration_test.ts
+```
+
+Tests exercise real SQLite, Restic, tar/zstd, and filesystem operations; a test
+Proton service simulates upload failure and recovery. A real Proton upload and
+download still require login.
+
+## Setup
+
+The backup disk mounts at `/mnt/backup-drive`. The sentinel's serial and
+filesystem UUID must match each job. The runner takes a disk-wide `.runner-lock`
+directory before staging or writing. If a crash leaves a stale lock, confirm no
+runner is active before removing it.
+
+Create the Restic password once and save a recovery copy in Proton Pass:
+
+```sh
+sudo install -d -o root -g root -m 700 /etc/backup-runner
+openssl rand -base64 48 | sudo tee /etc/backup-runner/restic-password >/dev/null
+sudo chmod 600 /etc/backup-runner/restic-password
+```
+
+The Gitea job also needs `/etc/backup-runner/gitea-token`, mode `600`,
+containing a read-only repository token with access to the repositories you want
+to protect.
+
+From `backup-runner/`, sign in to Proton:
+
+```sh
+docker volume create backup-proton-state
+docker compose run --rm proton-auth
+```
+
+Open the printed URL on any device and keep the command running until it
+finishes. The image pins official Proton Drive CLI 0.8.0 and verifies its
+published SHA-512 checksum. The external `backup-proton-state` volume holds the
+session, cache, and GPG/pass store. The local GPG key has no passphrase for
+unattended operation; access to this volume gives access to the stored session.
+App stack teardown does not delete this external volume.
+
+## Operations
+
+Run these from an opted-in app directory, such as `server/example-app/`:
+
+```sh
+docker compose --profile backup run --no-deps --rm backup init
+docker compose --profile backup run --no-deps --rm backup backup
+docker compose --profile backup run --no-deps --rm backup retry
+docker compose --profile backup run --no-deps --rm backup check
+docker compose --profile backup run --no-deps --rm backup check-read-data
+```
+
+`retry` drains the durable Proton outbox without reading the source or creating
+a new snapshot. `check` validates Restic metadata, queued archives, and complete
+remote archive pairs. `check-read-data` also reads every Restic pack. Neither
+check downloads Proton archive contents; test those through a downloaded
+restore.
+
+## Outbox and retention
+
+The runner creates a portable `tar.zst` and SHA-256 file inside an owner-only
+temporary directory on the backup disk. After checking both, it atomically
+renames the directory into the ready outbox. Archives stay plaintext locally
+while queued. Only complete published pairs enter the Effect Queue. Each retry
+rechecks the checksum and compressed stream before upload. Acknowledgement
+removes a pair only after Proton confirms both remote filenames. Legacy flat
+outbox pairs are also retried. Interrupted `.partial-*` directories are ignored
+and can be removed when no run is active.
+
+Both destinations use 14 daily, 8 weekly, 12 monthly, and 5 yearly retention.
+Proton keeps the newest snapshot in each retained UTC period, with Monday-start
+weeks, and moves expired pairs for this job to trash. It never empties account
+trash; trashed data may still consume quota. Restic applies its native retention
+and prunes unused data.
+
+To restore a Proton archive, download its `.tar.zst` and `.sha256` files through
+the official CLI or web app into an empty directory, then run:
+
+```sh
+sha256sum --check NAME.tar.zst.sha256
+zstd --test NAME.tar.zst
+tar --use-compress-program=zstd --extract --file NAME.tar.zst
+```
+
+Check SQLite with `PRAGMA quick_check` and a known query; check Git mirrors with
+`git fsck --full`. Restore into a separate directory before replacing live data.
+
+## Scope and schedule
+
+The runner never scans general host files, mounts the Docker socket, stops apps,
+or backs up unrelated application data. Gitea protects Git history and fetched LFS
+objects, not Gitea users, issues, settings, or its database. Existing cached
+mirrors remain available when a repository disappears from the API.
+
+The Effect `run-all` command lists the three opted-in stacks explicitly and runs
+them in order. It uses `--no-deps` so backup does not start or recreate apps. A
+failed stack does not prevent later stacks from running. It takes a host-side
+`.run-lock` as well as the per-run disk lock.
+
+After each job passes real backup and restore tests, install the timer from this
+directory. Check the Deno executable path in the service for your host first.
+
+```sh
+sudo install -o root -g root -m 644 systemd/backup-runner.service /etc/systemd/system/
+sudo install -o root -g root -m 644 systemd/backup-runner.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now backup-runner.timer
+```
+
+The timer runs daily at **03:30 UTC**. It remains disabled until
+those manual tests pass.

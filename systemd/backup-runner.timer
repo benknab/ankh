@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Deployment service backups each night
+
+[Timer]
+OnCalendar=*-*-* 03:30:00 UTC
+Persistent=true
+Unit=backup-runner.service
+
+[Install]
+WantedBy=timers.target

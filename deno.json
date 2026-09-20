@@ -1,0 +1,21 @@
+{
+  "imports": {
+    "@effect/platform-node": "npm:@effect/platform-node@4.0.0-rc.116",
+    "effect": "npm:effect@4.0.0-rc.116"
+  },
+  "nodeModulesDir": "auto",
+  "tasks": {
+    "check": "deno check main.ts src/*.ts",
+    "test": "deno test --allow-all",
+    "fmt": "deno fmt"
+  },
+  "compilerOptions": {
+    "exactOptionalPropertyTypes": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "strict": true
+  }
+}
