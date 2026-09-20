@@ -19,7 +19,8 @@ uploads.
 - `src/retention.ts`: UTC calendar retention over parsed snapshots.
 - `src/destinations.ts`, `src/runner.ts`: destination dispatch and job
   execution.
-- `src/auth.ts`, `src/host.ts`: login and sequential opted-in stack execution.
+- `src/auth.ts`, `src/scheduler.ts`: login and the in-container Effect
+  scheduler.
 - `main.ts`: Effect CLI and runtime entry point.
 
 All application infrastructure uses Effect libraries. External tools handle
@@ -96,11 +97,11 @@ App stack teardown does not delete this external volume.
 Run these from an opted-in app directory, such as `server/example-app/`:
 
 ```sh
-docker compose --profile backup run --no-deps --rm backup init
-docker compose --profile backup run --no-deps --rm backup backup
-docker compose --profile backup run --no-deps --rm backup retry
-docker compose --profile backup run --no-deps --rm backup check
-docker compose --profile backup run --no-deps --rm backup check-read-data
+docker compose run --no-deps --rm backup init
+docker compose run --no-deps --rm backup backup
+docker compose run --no-deps --rm backup retry
+docker compose run --no-deps --rm backup check
+docker compose run --no-deps --rm backup check-read-data
 ```
 
 `retry` drains the durable Proton outbox without reading the source or creating
@@ -145,20 +146,22 @@ or backs up unrelated application data. Gitea protects Git history and fetched L
 objects, not Gitea users, issues, settings, or its database. Existing cached
 mirrors remain available when a repository disappears from the API.
 
-The Effect `run-all` command lists the three opted-in stacks explicitly and runs
-them in order. It uses `--no-deps` so backup does not start or recreate apps. A
-failed stack does not prevent later stacks from running. It takes a host-side
-`.run-lock` as well as the per-run disk lock.
-
-After each job passes real backup and restore tests, install the timer from this
-directory. Check the Deno executable path in the service for your host first.
+Each app's `backup` service runs `backup-runner schedule` continuously. Effect's
+`Schedule.cron` triggers the job daily at **03:30 UTC**, without a daylight-saving offset. A normal `docker compose up -d` starts the
+scheduler alongside the app. To start only the backup service after setup:
 
 ```sh
-sudo install -o root -g root -m 644 systemd/backup-runner.service /etc/systemd/system/
-sudo install -o root -g root -m 644 systemd/backup-runner.timer /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now backup-runner.timer
+docker compose up -d --no-deps backup
+docker compose logs backup
 ```
 
-The timer runs daily at **03:30 UTC**. It remains disabled until
-those manual tests pass.
+All jobs share the disk lock, so they run one at a time even when their
+schedules fire together. A waiting job retries lock acquisition every ten
+seconds for up to six hours. Failure logs an error and preserves pending
+archives; the scheduler continues to the next night. Use `retry` for an
+immediate outbox retry.
+
+The scheduler waits until the next scheduled time on startup. It does not replay
+missed runs after downtime; use the manual `backup` command if needed. Docker's
+`restart: unless-stopped` brings the scheduler back after a reboot. No host
+timer, cron daemon, or Docker socket is needed.

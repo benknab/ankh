@@ -42,5 +42,6 @@ Do not use v3 examples or a separate copy of Effect documentation.
 
 Run `deno task fmt`, `deno task check`, and `deno task test`. Build the
 container and run its integration tests when changing process or filesystem
-behavior. Keep the daily timer disabled until real backups and restores pass for
-every opted-in app.
+behavior. Test scheduling with Effect's TestClock, including timezone handling
+and failure recovery. Enable scheduled services only after real backups and
+restores pass for every opted-in app.

@@ -1,4 +1,12 @@
-import { Context, Effect, FileSystem, Layer, Path, Schema } from "effect";
+import {
+  Context,
+  Effect,
+  FileSystem,
+  Layer,
+  Path,
+  Schedule,
+  Schema,
+} from "effect";
 import { type AbsolutePath, BackupError, type Job, JobJson } from "./model.ts";
 
 export class Storage extends Context.Service<Storage, {
@@ -54,10 +62,15 @@ export const withLock = Effect.fn("withLock")(function* (job: Job) {
   );
   yield* Effect.acquireRelease(
     fs.makeDirectory(directory, { mode: 0o700 }).pipe(
+      Effect.retry({
+        schedule: Schedule.spaced("10 seconds"),
+        times: 2160,
+        while: (error) => error.reason._tag === "AlreadyExists",
+      }),
       Effect.mapError(() =>
         new BackupError({
           message:
-            `Cannot acquire ${directory}; another run or a stale lock exists`,
+            `Cannot acquire ${directory}; check the drive and any active run or stale lock`,
         })
       ),
     ),

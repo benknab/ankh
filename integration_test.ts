@@ -1,10 +1,20 @@
 import { NodeServices } from "@effect/platform-node";
-import { DateTime, Effect, HashSet, Layer, Ref, Result, Schema } from "effect";
+import {
+  DateTime,
+  Deferred,
+  Effect,
+  Fiber,
+  HashSet,
+  Layer,
+  Ref,
+  Result,
+  Schema,
+} from "effect";
 import { FetchHttpClient } from "effect/unstable/http";
 import { Commands } from "./src/commands.ts";
 import { absolutePath, BackupError, Job, Proton } from "./src/model.ts";
 import { Outbox } from "./src/outbox.ts";
-import { Storage } from "./src/storage.ts";
+import { Storage, withLock } from "./src/storage.ts";
 import { assert, fixture } from "./test-support.ts";
 import { Destinations } from "./src/destinations.ts";
 import { ProtonDrive } from "./src/proton.ts";
@@ -17,6 +27,58 @@ const infrastructure = Layer.mergeAll(Commands.layer, Storage.layer).pipe(
   Layer.provideMerge(NodeServices.layer),
 );
 const live = Outbox.layer.pipe(Layer.provideMerge(infrastructure));
+
+Deno.test({
+  name: "concurrent scheduled jobs wait for the shared drive lock",
+  ignore: Deno.env.get("BACKUP_INTEGRATION") !== "1",
+  fn: () =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        const { fs, path } = yield* Storage;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const job = yield* Schema.decodeUnknownEffect(Job)({
+          ...fixture,
+          backupDrive: {
+            ...fixture.backupDrive,
+            sentinelFile: path.join(root, ".sentinel"),
+          },
+        });
+        const held = yield* Deferred.make<void>();
+        const release = yield* Deferred.make<void>();
+        const acquired = yield* Ref.make(false);
+        const first = yield* Effect.forkChild(
+          Effect.gen(function* () {
+            yield* withLock(job);
+            yield* Deferred.succeed(held, undefined);
+            yield* Deferred.await(release);
+          }).pipe(Effect.scoped),
+        );
+        yield* Deferred.await(held);
+        const second = yield* Effect.forkChild(
+          Effect.gen(function* () {
+            yield* withLock(job);
+            yield* Ref.set(acquired, true);
+          }).pipe(Effect.scoped),
+        );
+        yield* Effect.sleep("100 millis");
+        yield* assert(
+          !(yield* Ref.get(acquired)),
+          "another job must not enter while lock is held",
+        );
+        yield* Deferred.succeed(release, undefined);
+        yield* Fiber.join(first);
+        yield* Fiber.join(second);
+        yield* assert(
+          yield* Ref.get(acquired),
+          "waiting job must acquire released lock",
+        );
+        yield* assert(
+          !(yield* fs.exists(path.join(root, ".runner-lock"))),
+          "both scopes must release the lock",
+        );
+      }).pipe(Effect.scoped, Effect.provide(infrastructure)),
+    ),
+});
 
 Deno.test({
   name: "Proton credential setup creates a usable encryption key",

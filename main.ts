@@ -5,7 +5,7 @@ import { Live } from "./src/layers.ts";
 import { AbsolutePath, Actions } from "./src/model.ts";
 import { runJob } from "./src/runner.ts";
 import { login } from "./src/auth.ts";
-import { runAll } from "./src/host.ts";
+import { serve } from "./src/scheduler.ts";
 
 const commands = Actions.map((action) =>
   Command.make(action, {
@@ -20,12 +20,12 @@ const cli = Command.make("backup-runner").pipe(
   Command.withSubcommands([
     ...commands,
     Command.make("proton-login", {}, () => login()),
-    Command.make("run-all", {
-      root: Argument.String("deployment-root").pipe(
-        Argument.withDefault("/home/backup/deployment"),
+    Command.make("schedule", {
+      job: Argument.String("job-file").pipe(
+        Argument.withDefault("/job/backup.job.json"),
         Argument.withSchema(AbsolutePath),
       ),
-    }, ({ root }) => runAll(root)),
+    }, ({ job }) => serve(job)),
   ]),
   Command.run({ version: "0.1.0" }),
   Effect.provide(Live),
