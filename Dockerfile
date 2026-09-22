@@ -39,6 +39,8 @@ COPY deno.json deno.lock ./
 RUN deno install --frozen
 COPY main.ts ./
 COPY src ./src
+COPY gitea-askpass.sh /app/gitea-askpass.sh
+RUN chmod 0755 /app/gitea-askpass.sh
 RUN deno cache main.ts
 
 ENTRYPOINT ["deno", "run", "--allow-all", "/app/main.ts"]
