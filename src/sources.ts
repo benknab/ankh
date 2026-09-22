@@ -95,7 +95,15 @@ const stage = Effect.fn("Sources.stage")(function* (job: Job) {
     }
   }
   yield* privateDirectory(directory);
-  const auth = ["-c", `http.extraHeader=Authorization: token ${token}`];
+  // Git LFS asks Git for Basic credentials; Gitea does not accept the API's
+  // `token` header on its LFS endpoint. Keep the secret out of command args.
+  const gitOptions = {
+    env: {
+      GIT_ASKPASS: "/app/gitea-askpass.sh",
+      GIT_TERMINAL_PROMPT: "0",
+      GITEA_TOKEN_FILE: source.tokenFile,
+    },
+  };
   for (const repository of repositories) {
     const mirror = path.join(
       directory,
@@ -105,31 +113,28 @@ const stage = Effect.fn("Sources.stage")(function* (job: Job) {
     yield* privateDirectory(path.dirname(mirror));
     if (yield* fs.exists(mirror)) {
       yield* commands.run("git", [
-        ...auth,
         "-C",
         mirror,
         "remote",
         "update",
         "--prune",
-      ]);
+      ], gitOptions);
     } else {
       yield* commands.run("git", [
-        ...auth,
         "clone",
         "--mirror",
         `${base}/${repository.full_name}.git`,
         mirror,
-      ]);
+      ], gitOptions);
     }
     yield* commands.run("git", [
-      ...auth,
       "-C",
       mirror,
       "lfs",
       "fetch",
       "--all",
       "origin",
-    ]);
+    ], gitOptions);
     yield* commands.run("git", ["-C", mirror, "fsck", "--full"]);
   }
   const manifest = yield* Schema.encodeEffect(
