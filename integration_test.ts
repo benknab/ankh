@@ -1,16 +1,7 @@
 import { NodeServices } from "@effect/platform-node";
-import {
-  DateTime,
-  Deferred,
-  Effect,
-  Fiber,
-  HashSet,
-  Layer,
-  Ref,
-  Result,
-  Schema,
-} from "effect";
+import { DateTime, Deferred, Effect, Fiber, HashSet, Layer, Ref, Result, Schema } from "effect";
 import { FetchHttpClient } from "effect/unstable/http";
+import { test } from "vite-plus/test";
 import { Commands } from "./src/commands.ts";
 import { absolutePath, BackupError, Job, Proton } from "./src/model.ts";
 import { Outbox } from "./src/outbox.ts";
@@ -28,11 +19,9 @@ const infrastructure = Layer.mergeAll(Commands.layer, Storage.layer).pipe(
 );
 const live = Outbox.layer.pipe(Layer.provideMerge(infrastructure));
 
-Deno.test({
-  name:
-    "PostgreSQL source dumps and restores data, and rejects bad credentials",
-  ignore: Deno.env.get("BACKUP_POSTGRES_INTEGRATION") !== "1",
-  fn: () =>
+test.skipIf(process.env.BACKUP_POSTGRES_INTEGRATION !== "1")(
+  "PostgreSQL source dumps and restores data, and rejects bad credentials",
+  () =>
     Effect.runPromise(
       Effect.gen(function* () {
         const { fs, path } = yield* Storage;
@@ -52,12 +41,16 @@ Deno.test({
         for (const database of ["source_test", "restore_test"]) {
           yield* commands.run("createdb", ["--no-password", database], { env });
         }
-        yield* commands.run("psql", [
-          "--no-password",
-          "--set=ON_ERROR_STOP=1",
-          "--command",
-          "CREATE TABLE records(id integer PRIMARY KEY, value text); INSERT INTO records VALUES (1, 'verified');",
-        ], { env: { ...env, PGDATABASE: "source_test" } });
+        yield* commands.run(
+          "psql",
+          [
+            "--no-password",
+            "--set=ON_ERROR_STOP=1",
+            "--command",
+            "CREATE TABLE records(id integer PRIMARY KEY, value text); INSERT INTO records VALUES (1, 'verified');",
+          ],
+          { env: { ...env, PGDATABASE: "source_test" } },
+        );
         const job = yield* Schema.decodeUnknownEffect(Job)({
           ...fixture,
           name: "postgres-test",
@@ -72,27 +65,32 @@ Deno.test({
           },
         });
         const staged = yield* sources.stage(job);
-        yield* commands.run("pg_restore", [
-          "--no-password",
-          "--exit-on-error",
-          "--no-owner",
-          "--no-acl",
-          "--dbname=restore_test",
-          path.join(staged, "database.dump"),
-        ], { env });
-        const value = yield* commands.run("psql", [
-          "--no-password",
-          "--tuples-only",
-          "--no-align",
-          "--command=SELECT value FROM records WHERE id = 1;",
-        ], { env: { ...env, PGDATABASE: "restore_test" } });
+        yield* commands.run(
+          "pg_restore",
+          [
+            "--no-password",
+            "--exit-on-error",
+            "--no-owner",
+            "--no-acl",
+            "--dbname=restore_test",
+            path.join(staged, "database.dump"),
+          ],
+          { env },
+        );
+        const value = yield* commands.run(
+          "psql",
+          [
+            "--no-password",
+            "--tuples-only",
+            "--no-align",
+            "--command=SELECT value FROM records WHERE id = 1;",
+          ],
+          { env: { ...env, PGDATABASE: "restore_test" } },
+        );
         yield* assert(value === "verified", "dump must restore original data");
         yield* fs.writeFileString(passwordFile, "wrong-password");
         const failed = yield* sources.stage(job).pipe(Effect.result);
-        yield* assert(
-          Result.isFailure(failed),
-          "bad credentials must fail staging",
-        );
+        yield* assert(Result.isFailure(failed), "bad credentials must fail staging");
         if (Result.isFailure(failed)) {
           yield* assert(
             !failed.failure.message.includes("wrong-password"),
@@ -101,19 +99,18 @@ Deno.test({
         }
       }).pipe(
         Effect.scoped,
-        Effect.provide(Sources.layer.pipe(
-          Layer.provideMerge(
-            Layer.mergeAll(infrastructure, FetchHttpClient.layer),
+        Effect.provide(
+          Sources.layer.pipe(
+            Layer.provideMerge(Layer.mergeAll(infrastructure, FetchHttpClient.layer)),
           ),
-        )),
+        ),
       ),
     ),
-});
+);
 
-Deno.test({
-  name: "concurrent scheduled jobs wait for the shared drive lock",
-  ignore: Deno.env.get("BACKUP_INTEGRATION") !== "1",
-  fn: () =>
+test.skipIf(process.env.BACKUP_INTEGRATION !== "1")(
+  "concurrent scheduled jobs wait for the shared drive lock",
+  () =>
     Effect.runPromise(
       Effect.gen(function* () {
         const { fs, path } = yield* Storage;
@@ -143,29 +140,22 @@ Deno.test({
           }).pipe(Effect.scoped),
         );
         yield* Effect.sleep("100 millis");
-        yield* assert(
-          !(yield* Ref.get(acquired)),
-          "another job must not enter while lock is held",
-        );
+        yield* assert(!(yield* Ref.get(acquired)), "another job must not enter while lock is held");
         yield* Deferred.succeed(release, undefined);
         yield* Fiber.join(first);
         yield* Fiber.join(second);
-        yield* assert(
-          yield* Ref.get(acquired),
-          "waiting job must acquire released lock",
-        );
+        yield* assert(yield* Ref.get(acquired), "waiting job must acquire released lock");
         yield* assert(
           !(yield* fs.exists(path.join(root, ".runner-lock"))),
           "both scopes must release the lock",
         );
       }).pipe(Effect.scoped, Effect.provide(infrastructure)),
     ),
-});
+);
 
-Deno.test({
-  name: "Proton credential setup creates a usable encryption key",
-  ignore: Deno.env.get("BACKUP_INTEGRATION") !== "1",
-  fn: () =>
+test.skipIf(process.env.BACKUP_INTEGRATION !== "1")(
+  "Proton credential setup creates a usable encryption key",
+  () =>
     Effect.runPromise(
       Effect.gen(function* () {
         const commands = yield* Commands;
@@ -180,21 +170,25 @@ Deno.test({
         yield* fs.writeFileString("/proton/probe", "credential-round-trip", {
           mode: 0o600,
         });
-        yield* commands.run("gpg", [
-          "--batch",
-          "--yes",
-          "--recipient",
-          "backup-runner@localhost",
-          "--output",
-          "/proton/probe.gpg",
-          "--encrypt",
-          "/proton/probe",
-        ], { env: protonEnvironment });
-        const decrypted = yield* commands.run("gpg", [
-          "--batch",
-          "--decrypt",
-          "/proton/probe.gpg",
-        ], { env: protonEnvironment });
+        yield* commands.run(
+          "gpg",
+          [
+            "--batch",
+            "--yes",
+            "--recipient",
+            "backup-runner@localhost",
+            "--output",
+            "/proton/probe.gpg",
+            "--encrypt",
+            "/proton/probe",
+          ],
+          { env: protonEnvironment },
+        );
+        const decrypted = yield* commands.run(
+          "gpg",
+          ["--batch", "--decrypt", "/proton/probe.gpg"],
+          { env: protonEnvironment },
+        );
         yield* assert(
           decrypted === "credential-round-trip",
           "session encryption key must support decryption",
@@ -203,13 +197,11 @@ Deno.test({
         yield* login().pipe(Effect.provideService(Commands, testCommands));
       }).pipe(Effect.provide(infrastructure)),
     ),
-});
+);
 
-Deno.test({
-  name:
-    "durable outbox survives failure, retries through Queue, and restores SQLite",
-  ignore: Deno.env.get("BACKUP_INTEGRATION") !== "1",
-  fn: () =>
+test.skipIf(process.env.BACKUP_INTEGRATION !== "1")(
+  "durable outbox survives failure, retries through Queue, and restores SQLite",
+  () =>
     Effect.runPromise(
       Effect.gen(function* () {
         const { fs, path } = yield* Storage;
@@ -241,15 +233,10 @@ Deno.test({
           ((yield* fs.stat(queuePath)).mode & 0o777) === 0o700,
           "outbox must be private",
         );
-        const failure = yield* outbox.drain(
-          job,
-          destination,
-          () => Effect.fail(new BackupError({ message: "offline" })),
-        ).pipe(Effect.result);
-        yield* assert(
-          Result.isFailure(failure),
-          "upload failure must be reported",
-        );
+        const failure = yield* outbox
+          .drain(job, destination, () => Effect.fail(new BackupError({ message: "offline" })))
+          .pipe(Effect.result);
+        yield* assert(Result.isFailure(failure), "upload failure must be reported");
         yield* assert(
           (yield* fs.readDirectory(queuePath)).length === 1,
           "failure must keep the pair",
@@ -258,17 +245,10 @@ Deno.test({
         yield* outbox.drain(job, destination, (archive) =>
           Effect.gen(function* () {
             yield* fs.copyFile(archive.file, path.join(remote, archive.name));
-            yield* fs.copyFile(
-              archive.checksum,
-              path.join(remote, `${archive.name}.sha256`),
-            );
-            yield* Ref.update(uploads, (n) =>
-              n + 1);
-          }).pipe(
-            Effect.mapError((e) =>
-              new BackupError({ message: String(e) })
-            ),
-          ));
+            yield* fs.copyFile(archive.checksum, path.join(remote, `${archive.name}.sha256`));
+            yield* Ref.update(uploads, (n) => n + 1);
+          }).pipe(Effect.mapError((e) => new BackupError({ message: String(e) }))),
+        );
         yield* assert(
           (yield* Ref.get(uploads)) === 1,
           "Queue should deliver the pending archive once",
@@ -277,9 +257,7 @@ Deno.test({
           (yield* fs.readDirectory(queuePath)).length === 0,
           "acknowledged pair must leave the outbox",
         );
-        const archive = (yield* fs.readDirectory(remote)).find((file) =>
-          file.endsWith(".tar.zst")
-        );
+        const archive = (yield* fs.readDirectory(remote)).find((file) => file.endsWith(".tar.zst"));
         if (!archive) {
           return yield* Effect.die("missing uploaded archive");
         }
@@ -300,45 +278,32 @@ Deno.test({
           path.join(restore, "test-job/test.db"),
           "SELECT value FROM records;",
         ]);
-        yield* assert(
-          value === "verified",
-          "archive must restore the original database",
-        );
-        yield* Effect.logInfo(
-          "Restore verified",
-          DateTime.formatIso(yield* DateTime.now),
-        );
+        yield* assert(value === "verified", "archive must restore the original database");
+        yield* Effect.logInfo("Restore verified", DateTime.formatIso(yield* DateTime.now));
       }).pipe(Effect.scoped, Effect.provide(live)),
     ),
-});
+);
 
-Deno.test({
-  name: "Commands drains stdout and stderr and rejects nonzero exits",
-  ignore: Deno.env.get("BACKUP_INTEGRATION") !== "1",
-  fn: () =>
+test.skipIf(process.env.BACKUP_INTEGRATION !== "1")(
+  "Commands drains stdout and stderr and rejects nonzero exits",
+  () =>
     Effect.runPromise(
       Effect.gen(function* () {
         const commands = yield* Commands;
-        const result = yield* commands.run("sh", [
-          "-c",
-          "printf output; printf failure >&2; exit 7",
-        ]).pipe(Effect.result);
+        const result = yield* commands
+          .run("sh", ["-c", "printf output; printf failure >&2; exit 7"])
+          .pipe(Effect.result);
         yield* assert(Result.isFailure(result), "exit 7 must fail");
         if (Result.isFailure(result)) {
-          yield* assert(
-            result.failure.message.includes("failure"),
-            "stderr must be in the error",
-          );
+          yield* assert(result.failure.message.includes("failure"), "stderr must be in the error");
         }
       }).pipe(Effect.provide(infrastructure)),
     ),
-});
+);
 
-Deno.test({
-  name:
-    "real SQLite and Restic survive Proton failure, then retry and restore both copies",
-  ignore: Deno.env.get("BACKUP_INTEGRATION") !== "1",
-  fn: () =>
+test.skipIf(process.env.BACKUP_INTEGRATION !== "1")(
+  "real SQLite and Restic survive Proton failure, then retry and restore both copies",
+  () =>
     Effect.runPromise(
       Effect.gen(function* () {
         const { fs, path } = yield* Storage;
@@ -392,17 +357,9 @@ Deno.test({
                 if (!(yield* Ref.get(online))) {
                   return yield* new BackupError({ message: "offline" });
                 }
-                yield* fs.copyFile(
-                  archive.file,
-                  path.join(remote, archive.name),
-                );
-                yield* fs.copyFile(
-                  archive.checksum,
-                  path.join(remote, `${archive.name}.sha256`),
-                );
-              }).pipe(
-                Effect.mapError((e) => new BackupError({ message: String(e) })),
-              ),
+                yield* fs.copyFile(archive.file, path.join(remote, archive.name));
+                yield* fs.copyFile(archive.checksum, path.join(remote, `${archive.name}.sha256`));
+              }).pipe(Effect.mapError((e) => new BackupError({ message: String(e) }))),
             trash: () => Effect.void,
           }),
         );
@@ -420,19 +377,12 @@ Deno.test({
           runJob(jobFile, action).pipe(Effect.provide(adapters));
         yield* run("init");
         const failed = yield* run("backup").pipe(Effect.result);
-        yield* assert(
-          Result.isFailure(failed),
-          "offline Proton must fail the whole job",
-        );
+        yield* assert(Result.isFailure(failed), "offline Proton must fail the whole job");
         const env = {
           RESTIC_REPOSITORY: repository,
           RESTIC_PASSWORD_FILE: password,
         };
-        const snapshots = yield* commands.run(
-          "restic",
-          ["snapshots", "--json"],
-          { env },
-        );
+        const snapshots = yield* commands.run("restic", ["snapshots", "--json"], { env });
         yield* assert(
           snapshots.includes("test-host"),
           "Restic snapshot must survive Proton failure",
@@ -446,23 +396,13 @@ Deno.test({
           "retry should acknowledge the pending pair",
         );
         const restored = path.join(root, "restored");
-        yield* commands.run("restic", [
-          "restore",
-          "latest",
-          "--target",
-          restored,
-        ], { env });
+        yield* commands.run("restic", ["restore", "latest", "--target", restored], { env });
         const value = yield* commands.run("sqlite3", [
           path.join(restored, "staging/test-job/test.db"),
           "SELECT value FROM records;",
         ]);
-        yield* assert(
-          value === "verified",
-          "Restic must restore the staged database",
-        );
-        const archive = (yield* fs.readDirectory(remote)).find((name) =>
-          name.endsWith(".tar.zst")
-        );
+        yield* assert(value === "verified", "Restic must restore the staged database");
+        const archive = (yield* fs.readDirectory(remote)).find((name) => name.endsWith(".tar.zst"));
         if (!archive) {
           return yield* Effect.die("No uploaded archive");
         }
@@ -481,14 +421,11 @@ Deno.test({
           path.join(remote, "test-job/test.db"),
           "SELECT value FROM records;",
         ]);
-        yield* assert(
-          offsite === "verified",
-          "Proton archive must restore the same database",
-        );
+        yield* assert(offsite === "verified", "Proton archive must restore the same database");
         yield* assert(
           !(yield* fs.exists(path.join(root, ".runner-lock"))),
           "scope must release drive lock after failure and success",
         );
       }).pipe(Effect.scoped, Effect.provide(live)),
     ),
-});
+);

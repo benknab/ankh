@@ -1,10 +1,12 @@
 # Backup runner
 
-This is a standalone Deno project using Effect v4. Run all commands here.
+This is a standalone Node.js 24.21.0 LTS project using pnpm 11.25.0,
+Vite+ 1.1.0, and Effect v4. Run project commands here; run formatting from the
+deployment root.
 
 ## Effect documentation
 
-Run `deno install`, then read `node_modules/effect/AGENTS.md` before changing
+Run `pnpm install --frozen-lockfile`, then read `node_modules/effect/AGENTS.md` before changing
 code. That file is the skill index bundled with the installed Effect release.
 Follow its links into `node_modules/effect/ai-docs/src/` for the APIs you need.
 Read the installed source under `node_modules/effect/src/` and
@@ -23,9 +25,9 @@ Do not use v3 examples or a separate copy of Effect documentation.
   discriminated unions to make invalid combinations impossible; a backup request
   must include a staged path. Do not accept raw strings and arrays where a
   domain type fits.
-- Use FileSystem, Path, HttpClient, ChildProcessSpawner, and Effect CLI. Deno is
-  the runtime; the Effect Node platform runs through Deno's Node compatibility
-  layer.
+- Use FileSystem, Path, HttpClient, ChildProcessSpawner, and Effect CLI with
+  the native Effect Node platform. Node runs the TypeScript entry point directly;
+  keep type-only imports explicit and use only erasable TypeScript syntax.
 - Use DateTime for clocks and calendar logic, Queue and Stream for upload work,
   and Scope for subprocesses, locks, and temporary directories.
 - The disk outbox is durable. An in-memory Queue must never replace persisted
@@ -40,8 +42,13 @@ Do not use v3 examples or a separate copy of Effect documentation.
 
 ## Checks
 
-Run `deno task fmt`, `deno task check`, and `deno task test`. Build the
-container and run its integration tests when changing process or filesystem
+Run `pnpm check` and `pnpm test`. Vite+ runs Oxlint and Vitest;
+TypeScript checks source, tests, and tool config. Keep Vite+ settings in
+`vite.config.ts`. Run `pnpm fmt backup-runner` or
+`pnpm fmt:check backup-runner` from the deployment root using its single Oxfmt
+config. Do not add a local formatter dependency, config, or script.
+
+Build the container and its `test` target, then run its integration tests when changing process or filesystem
 behavior. Test scheduling with Effect's TestClock, including timezone handling
 and failure recovery. Enable scheduled services only after real backups and
 restores pass for every opted-in app.

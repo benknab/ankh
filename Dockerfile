@@ -1,4 +1,4 @@
-FROM denoland/deno:2.6.1
+FROM node:24.21.0-bookworm-slim AS base
 
 USER root
 
@@ -35,12 +35,25 @@ RUN wget --quiet --output-document=/usr/share/keyrings/postgresql.asc \
 
 WORKDIR /app
 
-COPY deno.json deno.lock ./
-RUN deno install --frozen
+RUN npm install --global pnpm@11.25.0
+
+# Test tooling stays in this opt-in image, not the production runner.
+FROM base AS test
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
+COPY main.ts test-support.ts tsconfig.json vite.config.ts ./
+COPY *_test.ts ./
+COPY src ./src
+COPY gitea-askpass.sh /app/gitea-askpass.sh
+RUN chmod 0755 /app/gitea-askpass.sh
+ENTRYPOINT ["pnpm", "test:integration"]
+
+FROM base AS runner
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile --prod
 COPY main.ts ./
 COPY src ./src
 COPY gitea-askpass.sh /app/gitea-askpass.sh
 RUN chmod 0755 /app/gitea-askpass.sh
-RUN deno cache main.ts
 
-ENTRYPOINT ["deno", "run", "--allow-all", "/app/main.ts"]
+ENTRYPOINT ["node", "/app/main.ts"]

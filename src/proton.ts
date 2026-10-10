@@ -13,22 +13,18 @@ export const protonEnvironment = {
   PROTON_DRIVE_LOG_LEVEL: "WARNING",
 };
 
-export class ProtonDrive extends Context.Service<ProtonDrive, {
-  readonly initialize: (
-    destination: Proton,
-  ) => Effect.Effect<void, BackupError>;
-  readonly list: (
-    destination: Proton,
-  ) => Effect.Effect<HashSet.HashSet<string>, BackupError>;
-  readonly upload: (
-    destination: Proton,
-    archive: Archive,
-  ) => Effect.Effect<void, BackupError>;
-  readonly trash: (
-    destination: Proton,
-    names: HashSet.HashSet<ArchiveName>,
-  ) => Effect.Effect<void, BackupError>;
-}>()("backup-runner/ProtonDrive") {
+export class ProtonDrive extends Context.Service<
+  ProtonDrive,
+  {
+    readonly initialize: (destination: Proton) => Effect.Effect<void, BackupError>;
+    readonly list: (destination: Proton) => Effect.Effect<HashSet.HashSet<string>, BackupError>;
+    readonly upload: (destination: Proton, archive: Archive) => Effect.Effect<void, BackupError>;
+    readonly trash: (
+      destination: Proton,
+      names: HashSet.HashSet<ArchiveName>,
+    ) => Effect.Effect<void, BackupError>;
+  }
+>()("backup-runner/ProtonDrive") {
   static readonly layer = Layer.effect(
     ProtonDrive,
     Effect.gen(function* () {
@@ -40,73 +36,61 @@ export class ProtonDrive extends Context.Service<ProtonDrive, {
       const list = Effect.fn("ProtonDrive.list")(
         function* (destination: Proton) {
           const nodes = yield* Schema.decodeUnknownEffect(RemoteNodes)(
-            yield* run([
-              "list",
-              "--json",
-              "--type",
-              "file",
-              destination.remoteFolder,
-            ]),
+            yield* run(["list", "--json", "--type", "file", destination.remoteFolder]),
           );
           return HashSet.fromIterable(nodes.map((node) => node.name.value));
         },
         Effect.mapError((e) => new BackupError({ message: String(e) })),
       );
-      const initialize = Effect.fn("ProtonDrive.initialize")(
-        function* (destination: Proton) {
-          let parent = "/my-files";
-          for (
-            const name of destination.remoteFolder.slice("/my-files/".length)
-              .split("/")
-          ) {
-            const current = `${parent}/${name}`;
-            yield* run(["info", current]).pipe(
-              Effect.catch(() => run(["create-folder", parent, name])),
-            );
-            parent = current;
-          }
-        },
-      );
-      const upload = Effect.fn("ProtonDrive.upload")(
-        function* (destination: Proton, archive: Archive) {
+      const initialize = Effect.fn("ProtonDrive.initialize")(function* (destination: Proton) {
+        let parent = "/my-files";
+        for (const name of destination.remoteFolder.slice("/my-files/".length).split("/")) {
+          const current = `${parent}/${name}`;
+          yield* run(["info", current]).pipe(
+            Effect.catch(() => run(["create-folder", parent, name])),
+          );
+          parent = current;
+        }
+      });
+      const upload = Effect.fn("ProtonDrive.upload")(function* (
+        destination: Proton,
+        archive: Archive,
+      ) {
+        yield* run([
+          "upload",
+          "--file-conflict-strategy",
+          "create-new-revision",
+          "--skip-thumbnails",
+          archive.file,
+          archive.checksum,
+          destination.remoteFolder,
+        ]);
+        const names = yield* list(destination);
+        if (!HashSet.has(names, archive.name) || !HashSet.has(names, `${archive.name}.sha256`)) {
+          return yield* new BackupError({
+            message: `Proton did not confirm archive pair ${archive.name}`,
+          });
+        }
+      });
+      const trash = Effect.fn("ProtonDrive.trash")(function* (
+        destination: Proton,
+        names: HashSet.HashSet<ArchiveName>,
+      ) {
+        for (const name of names) {
+          const pair = [name, `${name}.sha256`];
           yield* run([
-            "upload",
-            "--file-conflict-strategy",
-            "create-new-revision",
-            "--skip-thumbnails",
-            archive.file,
-            archive.checksum,
-            destination.remoteFolder,
+            "trash",
+            "--json",
+            ...pair.map((file) => `${destination.remoteFolder}/${file}`),
           ]);
-          const names = yield* list(destination);
-          if (
-            !HashSet.has(names, archive.name) ||
-            !HashSet.has(names, `${archive.name}.sha256`)
-          ) {
+          const remaining = yield* list(destination);
+          if (pair.some((file) => HashSet.has(remaining, file))) {
             return yield* new BackupError({
-              message: `Proton did not confirm archive pair ${archive.name}`,
+              message: `Proton did not confirm trashing ${name}`,
             });
           }
-        },
-      );
-      const trash = Effect.fn("ProtonDrive.trash")(
-        function* (destination: Proton, names: HashSet.HashSet<ArchiveName>) {
-          for (const name of names) {
-            const pair = [name, `${name}.sha256`];
-            yield* run([
-              "trash",
-              "--json",
-              ...pair.map((file) => `${destination.remoteFolder}/${file}`),
-            ]);
-            const remaining = yield* list(destination);
-            if (pair.some((file) => HashSet.has(remaining, file))) {
-              return yield* new BackupError({
-                message: `Proton did not confirm trashing ${name}`,
-              });
-            }
-          }
-        },
-      );
+        }
+      });
       return ProtonDrive.of({ initialize, list, upload, trash });
     }),
   );

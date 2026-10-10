@@ -1,0 +1,11 @@
+minimumReleaseAgeExclude:
+  - "@types/node@24.19.2"
+overrides:
+  # Keep the Node adapters on the same Effect release as the app.
+  "@effect/platform-node-shared": 4.0.0-rc.116
+  vite: npm:@voidzero-dev/vite-plus-core@1.1.0
+  vitest: 5.0.3
+peerDependencyRules:
+  allowedVersions:
+    # Vite+ uses its own version number for its Vite-compatible core.
+    vite: "1.1.0"

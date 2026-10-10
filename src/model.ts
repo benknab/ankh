@@ -1,13 +1,12 @@
 import { Brand, Schema } from "effect";
 
-export class BackupError
-  extends Schema.TaggedError<BackupError>()("BackupError", {
-    message: Schema.String,
-  }) {}
+export class BackupError extends Schema.TaggedError<BackupError>()("BackupError", {
+  message: Schema.String,
+}) {}
 
-export const JobName = Schema.String.check(
-  Schema.isPattern(/^[a-z0-9][a-z0-9-]*$/),
-).pipe(Schema.brand("JobName"));
+export const JobName = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]*$/)).pipe(
+  Schema.brand("JobName"),
+);
 export type JobName = typeof JobName.Type;
 export const AbsolutePath = Schema.String.check(
   Schema.isPattern(/^\/(?!$)(?!.*(?:^|\/)\.\.?($|\/))[^\0]+$/),
@@ -23,9 +22,7 @@ export const ArchiveName = Schema.String.check(
 ).pipe(Schema.brand("ArchiveName"));
 export type ArchiveName = typeof ArchiveName.Type;
 export const archiveFileName = Brand.nominal<ArchiveName>();
-const FileName = Schema.String.check(
-  Schema.isPattern(/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/),
-);
+const FileName = Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/));
 const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 
 export const Retention = Schema.Struct({
@@ -33,9 +30,7 @@ export const Retention = Schema.Struct({
   weekly: Count,
   monthly: Count,
   yearly: Count,
-}).check(
-  Schema.makeFilter((r) => r.daily + r.weekly + r.monthly + r.yearly > 0),
-);
+}).check(Schema.makeFilter((r) => r.daily + r.weekly + r.monthly + r.yearly > 0));
 export type Retention = typeof Retention.Type;
 
 export const Sqlite = Schema.Struct({
@@ -48,14 +43,12 @@ export const Gitea = Schema.Struct({
   apiUrl: Schema.String.check(Schema.isPattern(/^https?:\/\/[^\s]+$/)),
   tokenFile: AbsolutePath,
 });
-const PostgresName = Schema.String.check(
-  Schema.isPattern(/^[a-zA-Z_][a-zA-Z0-9_-]*$/),
-).pipe(Schema.brand("PostgresName"));
+const PostgresName = Schema.String.check(Schema.isPattern(/^[a-zA-Z_][a-zA-Z0-9_-]*$/)).pipe(
+  Schema.brand("PostgresName"),
+);
 export const Postgres = Schema.Struct({
   type: Schema.Literal("postgres"),
-  hostname: Schema.String.check(
-    Schema.isPattern(/^[a-zA-Z0-9][a-zA-Z0-9.-]*$/),
-  ),
+  hostname: Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9][a-zA-Z0-9.-]*$/)),
   port: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 65535 })),
   database: PostgresName,
   username: PostgresName,
@@ -89,22 +82,14 @@ export const Job = Schema.Struct({
   }),
   destinations: Schema.Array(Destination).check(
     Schema.isMinLength(1),
-    Schema.makeFilter((ds) =>
-      new Set(ds.map((d) => d.type)).size === ds.length
-    ),
+    Schema.makeFilter((ds) => new Set(ds.map((d) => d.type)).size === ds.length),
   ),
   retention: Retention,
 });
 export type Job = typeof Job.Type;
 export const JobJson = Schema.fromJsonString(Job);
-export const Actions = [
-  "init",
-  "backup",
-  "retry",
-  "check",
-  "check-read-data",
-] as const;
-export type Action = typeof Actions[number];
+export const Actions = ["init", "backup", "retry", "check", "check-read-data"] as const;
+export type Action = (typeof Actions)[number];
 export type DestinationRequest =
   | { readonly action: "backup"; readonly stage: AbsolutePath }
   | { readonly action: Exclude<Action, "backup"> };

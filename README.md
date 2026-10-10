@@ -1,6 +1,7 @@
 # Backup runner
 
-A standalone Deno project built with **Effect 4.0.0-rc.116**. Each opted-in app
+A standalone **Node.js 24.21.0 LTS** project using **pnpm 11.25.0**,
+**Vite+ 1.1.0**, and **Effect 4.0.0-rc.116**. Each opted-in app
 owns its Compose backup service, source mounts, and job file. The runner stages
 and checks the source once, then attempts every configured destination. A failed
 destination fails the job while preserving successful copies and pending
@@ -34,26 +35,37 @@ skill bundled in `node_modules/effect/`.
 Run these commands from `backup-runner/`:
 
 ```sh
-deno install --frozen
-deno task fmt
-deno task check
-deno task test
+pnpm install --frozen-lockfile
+pnpm check
+pnpm test
+pnpm start --help
 docker build -t backup-runner:local .
 ```
 
+Node runs TypeScript directly, without a build step. `pnpm check` runs Vite+
+Oxlint and TypeScript; `pnpm test` runs Vite+ Vitest. Tests and configuration use
+the same strict type checks as the source. Format only from the deployment root with
+`pnpm fmt backup-runner` or `pnpm fmt:check backup-runner`; use its single root
+Oxfmt config and installation.
+
+Tests load the Vite+ config with Node's native TypeScript support. The integration
+command also disables Vitest's disk cache so it can run in a read-only container.
+The TypeScript config includes DOM declarations required by Effect's Web APIs
+and Vite+'s bundled test types; tests and the app still run in Node, not a browser.
+
 Unit tests use service layers and do not need credentials. Integration tests
-need the external tools in the image:
+need the external tools in the image. Build the separate test target, which
+includes Vite+ and the test files; the production image installs only runtime
+dependencies:
 
 ```sh
+docker build --target test -t backup-runner:test .
 docker run --rm --read-only --cap-drop ALL --cap-add DAC_OVERRIDE \
   --security-opt no-new-privileges:true \
   --tmpfs /tmp:size=128m,mode=1777 --tmpfs /staging:size=64m,mode=0700 \
   --tmpfs /proton:size=32m,mode=0700 \
   -e BACKUP_INTEGRATION=1 \
-  -v "$PWD/integration_test.ts:/app/integration_test.ts:ro" \
-  -v "$PWD/test-support.ts:/app/test-support.ts:ro" \
-  --entrypoint deno backup-runner:local \
-  test --allow-all --no-check /app/integration_test.ts
+  backup-runner:test
 ```
 
 Tests exercise real SQLite, Restic, tar/zstd, and filesystem operations; a test

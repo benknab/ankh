@@ -12,6 +12,7 @@ const platform = Layer.mergeAll(NodeServices.layer, FetchHttpClient.layer);
 const infrastructure = Layer.mergeAll(Commands.layer, Storage.layer).pipe(
   Layer.provideMerge(platform),
 );
-const adapters = Layer.mergeAll(Outbox.layer, ProtonDrive.layer, Sources.layer)
-  .pipe(Layer.provideMerge(infrastructure));
+const adapters = Layer.mergeAll(Outbox.layer, ProtonDrive.layer, Sources.layer).pipe(
+  Layer.provideMerge(infrastructure),
+);
 export const Live = Destinations.layer.pipe(Layer.provideMerge(adapters));

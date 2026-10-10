@@ -12,34 +12,38 @@ export const login = Effect.fn("Proton.login")(function* () {
   }
   const options = { env: protonEnvironment };
   const identity = "backup-runner@localhost";
-  const keys = yield* commands.run("gpg", [
-    "--batch",
-    "--with-colons",
-    "--list-secret-keys",
-  ], options);
+  const keys = yield* commands.run(
+    "gpg",
+    ["--batch", "--with-colons", "--list-secret-keys"],
+    options,
+  );
   if (!keys.includes(identity)) {
-    yield* commands.run("gpg", [
-      "--batch",
-      "--pinentry-mode",
-      "loopback",
-      "--passphrase",
-      "",
-      "--quick-generate-key",
-      `Backup Runner <${identity}>`,
-      "default",
-      "default",
-      "0",
-    ], options);
+    yield* commands.run(
+      "gpg",
+      [
+        "--batch",
+        "--pinentry-mode",
+        "loopback",
+        "--passphrase",
+        "",
+        "--quick-generate-key",
+        `Backup Runner <${identity}>`,
+        "default",
+        "default",
+        "0",
+      ],
+      options,
+    );
   }
-  const listing = yield* commands.run("gpg", [
-    "--batch",
-    "--with-colons",
-    "--list-secret-keys",
-    identity,
-  ], options);
-  const fingerprint = listing.split("\n").find((line) =>
-    line.startsWith("fpr:")
-  )?.split(":")[9];
+  const listing = yield* commands.run(
+    "gpg",
+    ["--batch", "--with-colons", "--list-secret-keys", identity],
+    options,
+  );
+  const fingerprint = listing
+    .split("\n")
+    .find((line) => line.startsWith("fpr:"))
+    ?.split(":")[9];
   if (!fingerprint) {
     return yield* new BackupError({
       message: "No GPG fingerprint for Proton credentials",
@@ -47,22 +51,26 @@ export const login = Effect.fn("Proton.login")(function* () {
   }
   // Repair the sign-only key created by the pre-Effect prototype.
   if (
-    !listing.split("\n").some((line) =>
-      line.startsWith("ssb:") && line.split(":")[11]?.includes("e")
-    )
+    !listing
+      .split("\n")
+      .some((line) => line.startsWith("ssb:") && line.split(":")[11]?.includes("e"))
   ) {
-    yield* commands.run("gpg", [
-      "--batch",
-      "--pinentry-mode",
-      "loopback",
-      "--passphrase",
-      "",
-      "--quick-add-key",
-      fingerprint,
-      "cv25519",
-      "encrypt",
-      "0",
-    ], options);
+    yield* commands.run(
+      "gpg",
+      [
+        "--batch",
+        "--pinentry-mode",
+        "loopback",
+        "--passphrase",
+        "",
+        "--quick-add-key",
+        fingerprint,
+        "cv25519",
+        "encrypt",
+        "0",
+      ],
+      options,
+    );
   }
   if (!(yield* fs.exists("/proton/pass/.gpg-id"))) {
     yield* commands.run("pass", ["init", fingerprint], options);

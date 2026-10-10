@@ -3,52 +3,52 @@ import { Commands } from "./commands.ts";
 import { type DestinationRequest, type Job, type Restic } from "./model.ts";
 import { Storage } from "./storage.ts";
 
-export const runRestic = Effect.fn("Restic.run")(
-  function* (job: Job, destination: Restic, request: DestinationRequest) {
-    const { action } = request;
-    if (action === "retry") {
-      return;
-    }
-    const { fs, path } = yield* Storage;
-    const commands = yield* Commands;
-    yield* Schema.decodeUnknownEffect(Schema.NonEmptyString)(
-      (yield* fs.readFileString(destination.passwordFile)).trim(),
-    );
-    const options = {
-      env: {
-        RESTIC_CACHE_DIR: "/tmp/restic-cache",
-        RESTIC_REPOSITORY: destination.repository,
-        RESTIC_PASSWORD_FILE: destination.passwordFile,
-      },
-    };
-    const run = (args: readonly string[]) =>
-      commands.run("restic", args, options).pipe(Effect.tap(Effect.logInfo));
-    if (action === "init") {
-      if (!(yield* fs.exists(path.join(destination.repository, "config")))) {
-        yield* run(["init"]);
-      } else {
-        yield* run(["snapshots", "--json"]);
-      }
-    } else if (request.action === "backup") {
-      const selection = ["--host", job.host, "--tag", `job:${job.name}`];
-      yield* run(["backup", request.stage, ...selection]);
-      yield* run([
-        "forget",
-        ...selection,
-        "--keep-daily",
-        String(job.retention.daily),
-        "--keep-weekly",
-        String(job.retention.weekly),
-        "--keep-monthly",
-        String(job.retention.monthly),
-        "--keep-yearly",
-        String(job.retention.yearly),
-        "--prune",
-      ]);
+export const runRestic = Effect.fn("Restic.run")(function* (
+  job: Job,
+  destination: Restic,
+  request: DestinationRequest,
+) {
+  const { action } = request;
+  if (action === "retry") {
+    return;
+  }
+  const { fs, path } = yield* Storage;
+  const commands = yield* Commands;
+  yield* Schema.decodeUnknownEffect(Schema.NonEmptyString)(
+    (yield* fs.readFileString(destination.passwordFile)).trim(),
+  );
+  const options = {
+    env: {
+      RESTIC_CACHE_DIR: "/tmp/restic-cache",
+      RESTIC_REPOSITORY: destination.repository,
+      RESTIC_PASSWORD_FILE: destination.passwordFile,
+    },
+  };
+  const run = (args: readonly string[]) =>
+    commands.run("restic", args, options).pipe(Effect.tap(Effect.logInfo));
+  if (action === "init") {
+    if (!(yield* fs.exists(path.join(destination.repository, "config")))) {
+      yield* run(["init"]);
     } else {
-      yield* run(
-        action === "check-read-data" ? ["check", "--read-data"] : ["check"],
-      );
+      yield* run(["snapshots", "--json"]);
     }
-  },
-);
+  } else if (request.action === "backup") {
+    const selection = ["--host", job.host, "--tag", `job:${job.name}`];
+    yield* run(["backup", request.stage, ...selection]);
+    yield* run([
+      "forget",
+      ...selection,
+      "--keep-daily",
+      String(job.retention.daily),
+      "--keep-weekly",
+      String(job.retention.weekly),
+      "--keep-monthly",
+      String(job.retention.monthly),
+      "--keep-yearly",
+      String(job.retention.yearly),
+      "--prune",
+    ]);
+  } else {
+    yield* run(action === "check-read-data" ? ["check", "--read-data"] : ["check"]);
+  }
+});
