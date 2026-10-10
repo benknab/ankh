@@ -1,5 +1,5 @@
 import { Context, DateTime, Effect, Layer, Schema } from "effect";
-import { HttpClient, HttpClientResponse } from "effect/unstable/http";
+import { HttpClient, HttpClientResponse } from "effect/http";
 import { Commands } from "./commands.ts";
 import { type AbsolutePath, absolutePath, BackupError, type Job } from "./model.ts";
 import { privateDirectory, Storage } from "./storage.ts";

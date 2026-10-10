@@ -1,6 +1,6 @@
 import { NodeRuntime } from "@effect/platform-node";
 import { Effect } from "effect";
-import { Argument, Command } from "effect/unstable/cli";
+import { Argument, Command } from "effect/cli";
 import { Live } from "./src/layers.ts";
 import { AbsolutePath, Actions } from "./src/model.ts";
 import { runJob } from "./src/runner.ts";

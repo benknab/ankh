@@ -1,6 +1,6 @@
 import { NodeServices } from "@effect/platform-node";
 import { DateTime, Deferred, Effect, Fiber, HashSet, Layer, Ref, Result, Schema } from "effect";
-import { FetchHttpClient } from "effect/unstable/http";
+import { FetchHttpClient } from "effect/http";
 import { test } from "vite-plus/test";
 import { Commands } from "./src/commands.ts";
 import { absolutePath, BackupError, Job, Proton } from "./src/model.ts";

@@ -1,6 +1,6 @@
 import { NodeServices } from "@effect/platform-node";
 import { Layer } from "effect";
-import { FetchHttpClient } from "effect/unstable/http";
+import { FetchHttpClient } from "effect/http";
 import { Commands } from "./commands.ts";
 import { Destinations } from "./destinations.ts";
 import { Outbox } from "./outbox.ts";

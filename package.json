@@ -12,8 +12,8 @@
     "test:integration": "vp test run --configLoader native --cache=false integration_test.ts"
   },
   "dependencies": {
-    "@effect/platform-node": "4.0.0-rc.116",
-    "effect": "4.0.0-rc.116"
+    "@effect/platform-node": "4.0.2",
+    "effect": "4.0.2"
   },
   "devDependencies": {
     "@types/node": "24.19.2",

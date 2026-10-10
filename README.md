@@ -1,11 +1,15 @@
 # Backup runner
 
 A standalone **Node.js 24.21.0 LTS** project using **pnpm 11.25.0**,
-**Vite+ 1.1.0**, and **Effect 4.0.0-rc.116**. Each opted-in app
+**Vite+ 1.1.0**, and stable **Effect 4.0.2**. Each opted-in app
 owns its Compose backup service, source mounts, and job file. The runner stages
 and checks the source once, then attempts every configured destination. A failed
 destination fails the job while preserving successful copies and pending
 uploads.
+
+The Node platform packages also stay on stable 4.0.2. Adapter 4.0.3 requires
+Effect 4.0.3, which is not yet published. Keep the shared adapter pinned until a
+compatible newer stable pair is available.
 
 ## Structure
 
