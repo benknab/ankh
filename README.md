@@ -47,7 +47,9 @@ docker build -t backup-runner:local .
 ```
 
 Node runs TypeScript directly, without a build step. `pnpm check` runs Vite+
-Oxlint and TypeScript; `pnpm test` runs Vite+ Vitest. Tests and configuration use
+Oxlint, including the recommended Effect rules, and TypeScript; `pnpm test` runs
+Vite+ Vitest. Installation patches Oxlint through `@effect/tsgo`, not TypeScript.
+Run `pnpm prepare` if you install with scripts disabled. Tests and configuration use
 the same strict type checks as the source. Format only from the deployment root with
 `pnpm fmt backup-runner` or `pnpm fmt:check backup-runner`; use its single root
 Oxfmt config and installation.

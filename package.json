@@ -9,14 +9,18 @@
     "lint": "vp lint",
     "typecheck": "tsc --noEmit",
     "test": "vp test run --configLoader native",
-    "test:integration": "vp test run --configLoader native --cache=false integration_test.ts"
+    "test:integration": "vp test run --configLoader native --cache=false integration_test.ts",
+    "prepare": "effect-tsgo patch --no-typescript --oxlint"
   },
   "dependencies": {
     "@effect/platform-node": "4.0.2",
     "effect": "4.0.2"
   },
   "devDependencies": {
+    "@effect/tsgo": "0.53.1",
     "@types/node": "24.19.2",
+    "oxlint": "1.87.0",
+    "oxlint-tsgolint": "7.0.2003",
     "typescript": "7.0.2",
     "vite": "npm:@voidzero-dev/vite-plus-core@1.1.0",
     "vite-plus": "1.1.0",

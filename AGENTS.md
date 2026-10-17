@@ -43,7 +43,9 @@ Do not use v3 examples or a separate copy of Effect documentation.
 ## Checks
 
 Run `pnpm check` and `pnpm test`. Vite+ runs Oxlint and Vitest;
-TypeScript checks source, tests, and tool config. Keep Vite+ settings in
+TypeScript checks source, tests, and tool config. The official `@effect/tsgo`
+recommended preset runs Effect rules through Oxlint. `prepare` patches only
+Oxlint and its type-aware runner; keep TypeScript unpatched. Keep Vite+ settings in
 `vite.config.ts`. Run `pnpm fmt backup-runner` or
 `pnpm fmt:check backup-runner` from the deployment root using its single Oxfmt
 config. Do not add a local formatter dependency, config, or script.

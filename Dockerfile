@@ -50,7 +50,7 @@ ENTRYPOINT ["pnpm", "test:integration"]
 
 FROM base AS runner
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN pnpm install --frozen-lockfile --prod
+RUN pnpm install --frozen-lockfile --prod --ignore-scripts
 COPY main.ts ./
 COPY src ./src
 COPY gitea-askpass.sh /app/gitea-askpass.sh
