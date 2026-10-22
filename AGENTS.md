@@ -1,8 +1,8 @@
 # Backup runner
 
-This is a standalone Node.js 24.21.0 LTS project using pnpm 11.25.0,
-Vite+ 1.1.0, and stable Effect 4.0.2. Run project commands here; run formatting from the
-deployment root.
+This is a standalone Node.js project using pnpm, Vite+, and stable Effect.
+Use the versions in `.node-version` and `package.json`. Run project commands here;
+run formatting from the deployment root.
 
 ## Effect documentation
 
