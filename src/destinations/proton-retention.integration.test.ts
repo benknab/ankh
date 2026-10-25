@@ -1,4 +1,4 @@
-import { it } from "@effect/vitest";
+import { expect, it } from "@effect/vitest";
 import { DateTime, Effect, HashSet, Ref, Result, Schema } from "effect";
 import { BackupError, Job, Proton } from "#domain/model.ts";
 import { ProtonDrive } from "#clients/proton/client.ts";
@@ -6,7 +6,7 @@ import { retainProton } from "#destinations/proton-retention.ts";
 import { archiveName } from "#domain/archive.ts";
 import { Storage } from "#storage/storage.ts";
 import { infrastructure } from "#testing/infrastructure.ts";
-import { assert, fixture } from "#testing/fixtures.ts";
+import { fixture } from "#testing/fixtures.ts";
 
 it.live("retention retries only journaled partial deletions and rejects unrelated orphans", () =>
   Effect.gen(function* () {
@@ -31,10 +31,10 @@ it.live("retention retries only journaled partial deletions and rejects unrelate
       list: () => Ref.get(names),
       trash: (_destination, expired) =>
         Effect.gen(function* () {
-          yield* assert(
+          expect(
             HashSet.size(expired) === 1 && HashSet.has(expired, old),
             "only the expired archive may be deleted",
-          );
+          ).toBe(true);
           yield* Ref.update(names, (set) => HashSet.remove(set, old));
           if (yield* Ref.getAndSet(fail, false)) {
             return yield* new BackupError({ message: "interrupted remote deletion" });
@@ -43,24 +43,26 @@ it.live("retention retries only journaled partial deletions and rejects unrelate
         }),
     });
     const run = retainProton(job, destination).pipe(Effect.provideService(ProtonDrive, proton));
-    yield* assert(Result.isFailure(yield* run.pipe(Effect.result)), "partial deletion must fail");
-    yield* assert(
+    expect(Result.isFailure(yield* run.pipe(Effect.result)), "partial deletion must fail").toBe(
+      true,
+    );
+    expect(
       yield* fs.exists(path.join(destination.outbox, `.retention-${job.name}.json`)),
       "failure must retain deletion intent",
-    );
+    ).toBe(true);
     yield* run;
-    yield* assert(
+    expect(
       (yield* fs.readDirectory(destination.outbox)).length === 0,
       "confirmed deletion must retire intent",
-    );
+    ).toBe(true);
     yield* Ref.update(names, (set) => HashSet.add(set, `${old}.sha256`));
-    yield* assert(
+    expect(
       Result.isFailure(yield* run.pipe(Effect.result)),
       "unjournaled orphan must require manual investigation",
-    );
-    yield* assert(
+    ).toBe(true);
+    expect(
       HashSet.has(yield* Ref.get(names), `${old}.sha256`),
       "arbitrary orphan must not be deleted",
-    );
+    ).toBe(true);
   }).pipe(Effect.provide(infrastructure)),
 );

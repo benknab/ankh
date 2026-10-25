@@ -1,10 +1,9 @@
-import { it } from "@effect/vitest";
+import { expect, it } from "@effect/vitest";
 import { DateTime, Effect, HashSet, Layer, Ref, Result, Schema } from "effect";
 import { Commands } from "#process/commands.ts";
 import { absolutePath, BackupError, JobName, Proton } from "#domain/model.ts";
 import { ProtonDrive } from "#clients/proton/client.ts";
 import { archiveName } from "#domain/archive.ts";
-import { assert } from "#testing/fixtures.ts";
 
 const destination = Schema.decodeSync(Proton)({
   type: "proton-drive",
@@ -29,7 +28,7 @@ it.effect("folder initialization only creates names missing from a successful li
     }).pipe(
       Effect.provide(ProtonDrive.layer.pipe(Layer.provide(Layer.succeed(Commands, commands)))),
     );
-    yield* assert((yield* Ref.get(calls)).length === 2, "missing folder must be created");
+    expect((yield* Ref.get(calls)).length === 2, "missing folder must be created").toBe(true);
     const failure = new BackupError({ message: "authentication failed" });
     const broken = Commands.of({
       run: (_binary, args) =>
@@ -43,10 +42,10 @@ it.effect("folder initialization only creates names missing from a successful li
       Effect.provide(ProtonDrive.layer.pipe(Layer.provide(Layer.succeed(Commands, broken)))),
       Effect.result,
     );
-    yield* assert(
+    expect(
       Result.isFailure(result) && result.failure === failure,
       "authentication error must be preserved",
-    );
+    ).toBe(true);
   }),
 );
 
@@ -65,7 +64,9 @@ it.effect("Proton rejects malformed listings and unconfirmed uploads", () =>
       Effect.provide(ProtonDrive.layer.pipe(Layer.provide(Layer.succeed(Commands, commands)))),
       Effect.result,
     );
-    yield* assert(Result.isFailure(result), "missing remote pair must fail upload confirmation");
+    expect(Result.isFailure(result), "missing remote pair must fail upload confirmation").toBe(
+      true,
+    );
     for (const invalid of ["not json", '[{"name":{"ok":false},"type":"file"}]']) {
       const result = yield* Effect.gen(function* () {
         return yield* (yield* ProtonDrive).list(destination);
@@ -79,7 +80,7 @@ it.effect("Proton rejects malformed listings and unconfirmed uploads", () =>
         ),
         Effect.result,
       );
-      yield* assert(Result.isFailure(result), "invalid listing must fail closed");
+      expect(Result.isFailure(result), "invalid listing must fail closed").toBe(true);
     }
   }),
 );
@@ -91,10 +92,10 @@ it.effect("Proton trash can resume a known partial deletion", () =>
       run: (_binary, args) =>
         Effect.gen(function* () {
           if (args.includes("trash")) {
-            yield* assert(
+            expect(
               !args.includes(`${destination.remoteFolder}/${name}`),
               "must only trash files that still exist",
-            );
+            ).toBe(true);
             yield* Ref.set(remaining, HashSet.empty());
             return "[]";
           }
@@ -106,9 +107,9 @@ it.effect("Proton trash can resume a known partial deletion", () =>
     }).pipe(
       Effect.provide(ProtonDrive.layer.pipe(Layer.provide(Layer.succeed(Commands, commands)))),
     );
-    yield* assert(
+    expect(
       HashSet.size(yield* Ref.get(remaining)) === 0,
       "remaining checksum must be removed",
-    );
+    ).toBe(true);
   }),
 );

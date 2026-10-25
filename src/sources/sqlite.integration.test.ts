@@ -1,4 +1,4 @@
-import { it } from "@effect/vitest";
+import { expect, it } from "@effect/vitest";
 import { Effect, Layer, Schema } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { Commands } from "#process/commands.ts";
@@ -6,7 +6,7 @@ import { Job } from "#domain/model.ts";
 import { Sources } from "#sources/sources.ts";
 import { Storage } from "#storage/storage.ts";
 import { infrastructure } from "#testing/infrastructure.ts";
-import { assert, fixture } from "#testing/fixtures.ts";
+import { fixture } from "#testing/fixtures.ts";
 
 it.live("SQLite staging preserves URI-special characters in source paths", () =>
   Effect.gen(function* () {
@@ -25,13 +25,13 @@ it.live("SQLite staging preserves URI-special characters in source paths", () =>
       source: { ...fixture.source, path: source },
     });
     const staged = yield* sources.stage(job);
-    yield* assert(
+    expect(
       (yield* commands.run("sqlite3", [
         path.join(staged, "test.db"),
         "SELECT value FROM records;",
       ])) === "verified",
       "staging must read the exact source path",
-    );
+    ).toBe(true);
   }).pipe(
     Effect.provide(
       Sources.layer.pipe(Layer.provideMerge(Layer.mergeAll(infrastructure, FetchHttpClient.layer))),

@@ -1,4 +1,4 @@
-import { it } from "@effect/vitest";
+import { expect, it } from "@effect/vitest";
 import { Effect, Layer, Result, Schema } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { Commands } from "#process/commands.ts";
@@ -6,7 +6,7 @@ import { Job } from "#domain/model.ts";
 import { Sources } from "#sources/sources.ts";
 import { Storage } from "#storage/storage.ts";
 import { infrastructure } from "#testing/infrastructure.ts";
-import { assert, fixture } from "#testing/fixtures.ts";
+import { fixture } from "#testing/fixtures.ts";
 
 it.live("PostgreSQL source dumps and restores data, and rejects bad credentials", () =>
   Effect.gen(function* () {
@@ -71,15 +71,15 @@ it.live("PostgreSQL source dumps and restores data, and rejects bad credentials"
       ],
       { env: { ...env, PGDATABASE: "restore_test" } },
     );
-    yield* assert(value === "verified", "dump must restore original data");
+    expect(value === "verified", "dump must restore original data").toBe(true);
     yield* fs.writeFileString(passwordFile, "wrong-password");
     const failed = yield* sources.stage(job).pipe(Effect.result);
-    yield* assert(Result.isFailure(failed), "bad credentials must fail staging");
+    expect(Result.isFailure(failed), "bad credentials must fail staging").toBe(true);
     if (Result.isFailure(failed)) {
-      yield* assert(
+      expect(
         !failed.failure.message.includes("wrong-password"),
         "errors must not expose passwords",
-      );
+      ).toBe(true);
     }
   }).pipe(
     Effect.provide(

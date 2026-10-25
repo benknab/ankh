@@ -1,8 +1,7 @@
-import { it } from "@effect/vitest";
+import { expect, it } from "@effect/vitest";
 import { Effect, Result } from "effect";
 import { Commands } from "#process/commands.ts";
 import { infrastructure } from "#testing/infrastructure.ts";
-import { assert } from "#testing/fixtures.ts";
 
 it.live("Commands drains stdout and stderr and rejects nonzero exits", () =>
   Effect.gen(function* () {
@@ -10,9 +9,9 @@ it.live("Commands drains stdout and stderr and rejects nonzero exits", () =>
     const result = yield* commands
       .run("sh", ["-c", "printf output; printf failure >&2; exit 7"])
       .pipe(Effect.result);
-    yield* assert(Result.isFailure(result), "exit 7 must fail");
+    expect(Result.isFailure(result), "exit 7 must fail").toBe(true);
     if (Result.isFailure(result)) {
-      yield* assert(result.failure.message.includes("failure"), "stderr must be in the error");
+      expect(result.failure.message.includes("failure"), "stderr must be in the error").toBe(true);
     }
   }).pipe(Effect.provide(infrastructure)),
 );
@@ -25,10 +24,10 @@ it.live("command diagnostics are bounded and redact supplied secrets", () =>
       ["--eval", 'process.stdout.write("x".repeat(1024 * 1024) + "end")'],
       { output: "tail" },
     );
-    yield* assert(
+    expect(
       tail.length <= 64 * 1024 && tail.endsWith("end"),
       "ordinary output must retain only a bounded tail",
-    );
+    ).toBe(true);
     const failed = yield* commands
       .run(
         process.execPath,
@@ -36,16 +35,16 @@ it.live("command diagnostics are bounded and redact supplied secrets", () =>
         { env: { PGPASSWORD: "synthetic-secret" } },
       )
       .pipe(Effect.result);
-    yield* assert(Result.isFailure(failed), "command must fail");
+    expect(Result.isFailure(failed), "command must fail").toBe(true);
     if (Result.isFailure(failed)) {
-      yield* assert(
+      expect(
         failed.failure.exitCode === 7 && failed.failure.operation === process.execPath,
         "structured failure details must survive",
-      );
-      yield* assert(
+      ).toBe(true);
+      expect(
         !failed.failure.message.includes("synthetic-secret"),
         "diagnostics must redact secrets",
-      );
+      ).toBe(true);
     }
   }).pipe(Effect.provide(infrastructure)),
 );

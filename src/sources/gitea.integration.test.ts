@@ -1,4 +1,4 @@
-import { it } from "@effect/vitest";
+import { expect, it } from "@effect/vitest";
 import { Effect, Layer, Schema } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
 import { Commands } from "#process/commands.ts";
@@ -6,7 +6,7 @@ import { Job } from "#domain/model.ts";
 import { Sources } from "#sources/sources.ts";
 import { Storage } from "#storage/storage.ts";
 import { infrastructure } from "#testing/infrastructure.ts";
-import { assert, fixture } from "#testing/fixtures.ts";
+import { fixture } from "#testing/fixtures.ts";
 
 it.live("Gitea staging updates a persistent mirror and restores Git and LFS contents", () =>
   Effect.gen(function* () {
@@ -47,10 +47,10 @@ it.live("Gitea staging updates a persistent mirror and restores Git and LFS cont
       run: (binary, args, options) =>
         binary === "git" && args[0] === "clone"
           ? Effect.gen(function* () {
-              yield* assert(
+              expect(
                 args[2] === "https://example.com/gitea/example/repository.git",
                 "clone URL must preserve the base path",
-              );
+              ).toBe(true);
               return yield* commands.run(
                 binary,
                 [args[0]!, args[1]!, repository, args[3]!],
@@ -83,13 +83,13 @@ it.live("Gitea staging updates a persistent mirror and restores Git and LFS cont
       { env: { GIT_LFS_SKIP_SMUDGE: "1" } },
     );
     yield* commands.run("git", ["-C", restored, "lfs", "pull"]);
-    yield* assert(
+    expect(
       (yield* fs.readFileString(path.join(restored, "README"))) === "second revision",
       "mirror must update existing refs",
-    );
-    yield* assert(
+    ).toBe(true);
+    expect(
       (yield* fs.readFileString(path.join(restored, "asset.bin"))) === "lfs-data".repeat(1024),
       "LFS objects must restore",
-    );
+    ).toBe(true);
   }).pipe(Effect.provide(infrastructure)),
 );

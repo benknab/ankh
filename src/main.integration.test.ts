@@ -1,10 +1,10 @@
-import { it } from "@effect/vitest";
+import { expect, it } from "@effect/vitest";
 import { Effect, Result, Schema } from "effect";
 import { Commands } from "#process/commands.ts";
 import { Actions, BackupError, Job } from "#domain/model.ts";
 import { Storage, withLock } from "#storage/storage.ts";
 import { infrastructure } from "#testing/infrastructure.ts";
-import { assert, fixture } from "#testing/fixtures.ts";
+import { fixture } from "#testing/fixtures.ts";
 import metadata from "#package" with { type: "json" };
 
 it.live("Node runs the TypeScript CLI and rejects unsafe job paths", () =>
@@ -14,17 +14,19 @@ it.live("Node runs the TypeScript CLI and rejects unsafe job paths", () =>
     const entry = path.join(import.meta.dirname, "main.ts");
     const help = yield* commands.run(process.execPath, [entry, "--help"]);
     for (const action of [...Actions, "schedule", "proton-login", "validate"]) {
-      yield* assert(help.includes(action), `missing subcommand: ${action}`);
+      expect(help.includes(action), `missing subcommand: ${action}`).toBe(true);
     }
     const version = yield* commands.run(process.execPath, [entry, "--version"]);
-    yield* assert(
+    expect(
       version === `backup-runner v${metadata.version}`,
       "CLI must use the package version",
-    );
+    ).toBe(true);
     const invalid = yield* commands
       .run(process.execPath, [entry, "backup", "relative/job.json"])
       .pipe(Effect.result);
-    yield* assert(Result.isFailure(invalid), "relative job paths must fail before accessing files");
+    expect(Result.isFailure(invalid), "relative job paths must fail before accessing files").toBe(
+      true,
+    );
   }).pipe(Effect.provide(infrastructure)),
 );
 
@@ -35,9 +37,8 @@ it.live("Node child processes drain large output and report failed exits", () =>
       "--eval",
       'process.stdout.write("o".repeat(256 * 1024)); process.stderr.write("e".repeat(256 * 1024));',
     ]);
-    yield* assert(
-      output === "o".repeat(256 * 1024),
-      "stdout and stderr must drain without deadlock",
+    expect(output === "o".repeat(256 * 1024), "stdout and stderr must drain without deadlock").toBe(
+      true,
     );
     const failed = yield* commands
       .run(process.execPath, [
@@ -45,13 +46,13 @@ it.live("Node child processes drain large output and report failed exits", () =>
         'process.stderr.write("probe-failure"); process.exitCode = 7;',
       ])
       .pipe(Effect.result);
-    yield* assert(Result.isFailure(failed), "nonzero exit must fail");
+    expect(Result.isFailure(failed), "nonzero exit must fail").toBe(true);
     if (Result.isFailure(failed)) {
-      yield* assert(
+      expect(
         failed.failure.message.includes("exited 7") &&
           failed.failure.message.includes("probe-failure"),
         "failure must preserve exit code and stderr",
-      );
+      ).toBe(true);
     }
   }).pipe(Effect.provide(infrastructure)),
 );
@@ -66,12 +67,12 @@ it.live("validate only reads the job file and rejects unknown fields", () =>
     yield* fs.writeFileString(file, JSON.stringify(fixture));
     yield* commands.run(process.execPath, [entry, "validate", file]);
     yield* fs.writeFileString(file, JSON.stringify({ ...fixture, ignored: true }));
-    yield* assert(
+    expect(
       Result.isFailure(
         yield* commands.run(process.execPath, [entry, "validate", file]).pipe(Effect.result),
       ),
       "unknown config fields must fail validation",
-    );
+    ).toBe(true);
   }).pipe(Effect.provide(infrastructure)),
 );
 
@@ -86,12 +87,12 @@ it.live("Node filesystem scopes release the drive lock after failure", () =>
     const lock = path.join(root, ".runner-lock");
     const failed = yield* Effect.gen(function* () {
       yield* withLock(job);
-      yield* assert(yield* fs.exists(lock), "lock must exist while held");
+      expect(yield* fs.exists(lock), "lock must exist while held").toBe(true);
       return yield* new BackupError({ message: "probe-failure" });
     }).pipe(Effect.scoped, Effect.result);
-    yield* assert(Result.isFailure(failed), "test job must fail");
-    yield* assert(!(yield* fs.exists(lock)), "failed job scope must release the lock");
+    expect(Result.isFailure(failed), "test job must fail").toBe(true);
+    expect(!(yield* fs.exists(lock)), "failed job scope must release the lock").toBe(true);
     yield* withLock(job).pipe(Effect.scoped);
-    yield* assert(!(yield* fs.exists(lock)), "next job must acquire and release the lock");
+    expect(!(yield* fs.exists(lock)), "next job must acquire and release the lock").toBe(true);
   }).pipe(Effect.provide(infrastructure)),
 );

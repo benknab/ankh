@@ -1,9 +1,8 @@
-import { it } from "@effect/vitest";
+import { expect, it } from "@effect/vitest";
 import { DateTime, Effect, Fiber, Ref } from "effect";
 import { TestClock } from "effect/testing";
 import { BackupError } from "#domain/model.ts";
 import { scheduledAttempts } from "#app/scheduler.ts";
-import { assert } from "#testing/fixtures.ts";
 
 for (const [season, utcHour] of [
   ["2026-09-20", "03"],
@@ -21,17 +20,17 @@ for (const [season, utcHour] of [
       );
       const fiber = yield* Effect.forkChild(scheduledAttempts(backup));
       yield* TestClock.adjust("59 seconds");
-      yield* assert(
+      expect(
         (yield* Ref.get(attempts)) === 0,
         "must wait for scheduled time, not run on startup",
-      );
+      ).toBe(true);
       yield* TestClock.adjust("1 second");
-      yield* assert((yield* Ref.get(attempts)) === 1, "must run at 03:30 local time");
+      expect((yield* Ref.get(attempts)) === 1, "must run at 03:30 local time").toBe(true);
       yield* TestClock.adjust("24 hours");
-      yield* assert(
+      expect(
         (yield* Ref.get(attempts)) === 2,
         "a failed job must not stop the next day's schedule",
-      );
+      ).toBe(true);
       yield* Fiber.interrupt(fiber);
     }),
   );
@@ -52,11 +51,11 @@ for (const [before, nextDayHours] of [
         ),
       );
       yield* TestClock.adjust("1 minute");
-      yield* assert((yield* Ref.get(attempts)) === 1, "first local run must occur");
+      expect((yield* Ref.get(attempts)) === 1, "first local run must occur").toBe(true);
       yield* TestClock.adjust(nextDayHours * 60 * 60 * 1000 - 1);
-      yield* assert((yield* Ref.get(attempts)) === 1, "must wait for the next local run");
+      expect((yield* Ref.get(attempts)) === 1, "must wait for the next local run").toBe(true);
       yield* TestClock.adjust(1);
-      yield* assert((yield* Ref.get(attempts)) === 2, "DST must preserve local scheduled time");
+      expect((yield* Ref.get(attempts)) === 2, "DST must preserve local scheduled time").toBe(true);
       yield* Fiber.interrupt(fiber);
     }),
   );

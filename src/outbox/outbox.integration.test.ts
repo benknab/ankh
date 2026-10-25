@@ -1,11 +1,11 @@
-import { it } from "@effect/vitest";
+import { expect, it } from "@effect/vitest";
 import { DateTime, Effect, Exit, Layer, Ref, Result, Schema } from "effect";
 import { Commands } from "#process/commands.ts";
 import { absolutePath, BackupError, Job, Proton } from "#domain/model.ts";
 import { Outbox } from "#outbox/outbox.ts";
 import { Storage } from "#storage/storage.ts";
 import { outboxInfrastructure } from "#testing/infrastructure.ts";
-import { assert, fixture } from "#testing/fixtures.ts";
+import { fixture } from "#testing/fixtures.ts";
 
 it.live("durable outbox survives failure, retries through Queue, and restores SQLite", () =>
   Effect.gen(function* () {
@@ -30,16 +30,20 @@ it.live("durable outbox survives failure, retries through Queue, and restores SQ
     const job = yield* Schema.decodeUnknownEffect(Job)(fixture);
     yield* outbox.enqueue(job, destination, stage);
     const initial = yield* fs.readDirectory(queuePath);
-    yield* assert(
+    expect(
       initial.length === 1 && !initial[0]?.startsWith(".partial"),
       "only a complete pair may be visible",
+    ).toBe(true);
+    expect(((yield* fs.stat(queuePath)).mode & 0o777) === 0o700, "outbox must be private").toBe(
+      true,
     );
-    yield* assert(((yield* fs.stat(queuePath)).mode & 0o777) === 0o700, "outbox must be private");
     const failure = yield* outbox
       .drain(job, destination, () => Effect.fail(new BackupError({ message: "offline" })))
       .pipe(Effect.result);
-    yield* assert(Result.isFailure(failure), "upload failure must be reported");
-    yield* assert((yield* fs.readDirectory(queuePath)).length === 1, "failure must keep the pair");
+    expect(Result.isFailure(failure), "upload failure must be reported").toBe(true);
+    expect((yield* fs.readDirectory(queuePath)).length === 1, "failure must keep the pair").toBe(
+      true,
+    );
     const uploads = yield* Ref.make(0);
     yield* outbox.drain(job, destination, (archive) =>
       Effect.gen(function* () {
@@ -48,11 +52,13 @@ it.live("durable outbox survives failure, retries through Queue, and restores SQ
         yield* Ref.update(uploads, (n) => n + 1);
       }).pipe(Effect.mapError((e) => new BackupError({ message: String(e) }))),
     );
-    yield* assert((yield* Ref.get(uploads)) === 1, "Queue should deliver the pending archive once");
-    yield* assert(
+    expect((yield* Ref.get(uploads)) === 1, "Queue should deliver the pending archive once").toBe(
+      true,
+    );
+    expect(
       (yield* fs.readDirectory(queuePath)).length === 0,
       "acknowledged pair must leave the outbox",
-    );
+    ).toBe(true);
     const archive = (yield* fs.readDirectory(remote)).find((file) => file.endsWith(".tar.zst"));
     if (!archive) {
       return yield* Effect.die("missing uploaded archive");
@@ -72,7 +78,7 @@ it.live("durable outbox survives failure, retries through Queue, and restores SQ
       path.join(restore, "test-job/test.db"),
       "SELECT value FROM records;",
     ]);
-    yield* assert(value === "verified", "archive must restore the original database");
+    expect(value === "verified", "archive must restore the original database").toBe(true);
     yield* Effect.logInfo("Restore verified", DateTime.formatIso(yield* DateTime.now));
   }).pipe(Effect.provide(outboxInfrastructure)),
 );
@@ -128,17 +134,19 @@ for (const legacy of [false, true]) {
           const pending = yield* Outbox;
           yield* pending.drain(job, destination, () => Ref.update(uploads, (n) => n + 1));
         }).pipe(Effect.provide(interrupted), Effect.exit);
-        yield* assert(Exit.isFailure(exit), "injected interruption must occur");
-        yield* assert(
+        expect(Exit.isFailure(exit), "injected interruption must occur").toBe(true);
+        expect(
           (yield* Ref.get(uploads)) === 1,
           "upload must have completed before interruption",
-        );
+        ).toBe(true);
         yield* outbox.drain(job, destination, () => Ref.update(uploads, (n) => n + 1));
-        yield* assert((yield* Ref.get(uploads)) === 1, "retired archives must not upload twice");
-        yield* assert(
+        expect((yield* Ref.get(uploads)) === 1, "retired archives must not upload twice").toBe(
+          true,
+        );
+        expect(
           (yield* fs.readDirectory(destination.outbox)).length === 0,
           "retry must complete local retirement",
-        );
+        ).toBe(true);
       }).pipe(Effect.provide(outboxInfrastructure)),
   );
 }
@@ -168,12 +176,12 @@ it.live("a corrupt ready archive stays on disk while later valid archives upload
     const result = yield* outbox
       .drain(job, destination, () => Ref.update(uploads, (n) => n + 1))
       .pipe(Effect.result);
-    yield* assert(Result.isFailure(result), "corruption must be reported");
-    yield* assert((yield* Ref.get(uploads)) === 1, "valid archive must still upload");
-    yield* assert(
+    expect(Result.isFailure(result), "corruption must be reported").toBe(true);
+    expect((yield* Ref.get(uploads)) === 1, "valid archive must still upload").toBe(true);
+    expect(
       (yield* fs.readDirectory(destination.outbox)).length === 1,
       "corrupt archive must stay available for diagnosis",
-    );
+    ).toBe(true);
   }).pipe(Effect.provide(outboxInfrastructure)),
 );
 
@@ -225,13 +233,13 @@ for (const failure of ["tar", "checksum", "verify", "zstd", "publish", "cleanup"
       const result = yield* Effect.gen(function* () {
         yield* (yield* Outbox).enqueue(job, destination, stage);
       }).pipe(Effect.provide(layer), Effect.result);
-      yield* assert(Result.isFailure(result), "failure must stay in the Effect error channel");
-      yield* assert(
+      expect(Result.isFailure(result), "failure must stay in the Effect error channel").toBe(true);
+      expect(
         (yield* fs.readDirectory(destination.outbox)).every((entry) =>
           entry.startsWith(".partial-"),
         ),
         "failed publication must not expose ready data",
-      );
+      ).toBe(true);
     }).pipe(Effect.provide(outboxInfrastructure)),
   );
 }

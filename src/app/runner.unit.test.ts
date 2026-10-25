@@ -1,4 +1,4 @@
-import { it } from "@effect/vitest";
+import { expect, it } from "@effect/vitest";
 import { DateTime, Effect, HashSet, Layer, Ref, Result, Schema } from "effect";
 import { Destinations } from "#destinations/destinations.ts";
 import { absolutePath, BackupError, Job, JobName } from "#domain/model.ts";
@@ -7,7 +7,7 @@ import { expiredSnapshots, parseSnapshotPairs } from "#domain/retention.ts";
 import { execute } from "#app/runner.ts";
 import { Sources } from "#sources/sources.ts";
 
-import { assert, fixture } from "#testing/fixtures.ts";
+import { fixture } from "#testing/fixtures.ts";
 
 it.effect("schemas reject unsafe paths, names, duplicate destinations, and empty retention", () =>
   Effect.gen(function* () {
@@ -25,7 +25,7 @@ it.effect("schemas reject unsafe paths, names, duplicate destinations, and empty
       },
     ]) {
       const result = yield* Schema.decodeUnknownEffect(Job)(input).pipe(Effect.result);
-      yield* assert(Result.isFailure(result), "invalid job must fail at the boundary");
+      expect(Result.isFailure(result), "invalid job must fail at the boundary").toBe(true);
     }
   }),
 );
@@ -54,10 +54,10 @@ for (const reverse of [false, true]) {
             Destinations.of({
               run: (_job, destination, request) =>
                 Effect.gen(function* () {
-                  yield* assert(
+                  expect(
                     request.action === "backup" && request.stage === "/staging/test-job",
                     "same stage must reach each destination",
-                  );
+                  ).toBe(true);
                   yield* Ref.update(attempts, (set) => HashSet.add(set, destination.type));
                   if (destination.type === failed) {
                     return yield* new BackupError({ message: "offline" });
@@ -69,9 +69,11 @@ for (const reverse of [false, true]) {
             Effect.provide(Layer.merge(source, destinations)),
             Effect.result,
           );
-          yield* assert(Result.isFailure(result), "partial failure must fail the job");
-          yield* assert((yield* Ref.get(stages)) === 1, "source must stage once");
-          yield* assert(HashSet.size(yield* Ref.get(attempts)) === 2, "both destinations must run");
+          expect(Result.isFailure(result), "partial failure must fail the job").toBe(true);
+          expect((yield* Ref.get(stages)) === 1, "source must stage once").toBe(true);
+          expect(HashSet.size(yield* Ref.get(attempts)) === 2, "both destinations must run").toBe(
+            true,
+          );
         }),
     );
   }
@@ -95,13 +97,15 @@ it.effect("retention consumes parsed snapshots and keeps newest per UTC period",
       monthly: 0,
       yearly: 0,
     });
-    yield* assert(HashSet.size(expired) === 2, "same day and same ISO week copies should expire");
-    yield* assert(
+    expect(HashSet.size(expired) === 2, "same day and same ISO week copies should expire").toBe(
+      true,
+    );
+    expect(
       !HashSet.has(expired, archiveName(job, DateTime.makeUnsafe(timestamps[0]!))),
       "newest must survive",
-    );
+    ).toBe(true);
     const missing = yield* parseSnapshotPairs(job, HashSet.fromIterable(names)).pipe(Effect.result);
-    yield* assert(Result.isFailure(missing), "retention must reject incomplete pairs");
+    expect(Result.isFailure(missing), "retention must reject incomplete pairs").toBe(true);
   }),
 );
 
@@ -127,10 +131,10 @@ it.effect("retention keeps 14 daily, 8 weekly, 12 monthly, and 5 yearly periods"
         yearly: 0,
         [test.policy]: test.count,
       };
-      yield* assert(
+      expect(
         HashSet.size(expiredSnapshots(snapshots, policy)) === 20 - test.count,
         `${test.policy} count is wrong`,
-      );
+      ).toBe(true);
     }
   }),
 );

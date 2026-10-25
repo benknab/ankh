@@ -1,7 +1,7 @@
-import { it } from "@effect/vitest";
+import { expect, it } from "@effect/vitest";
 import { Effect, Result, Schema } from "effect";
 import { Job, RemoteFolder } from "#domain/model.ts";
-import { assert, fixture } from "#testing/fixtures.ts";
+import { fixture } from "#testing/fixtures.ts";
 
 it.effect("configuration rejects unknown keys, invalid schedules, and destructive overlaps", () =>
   Effect.gen(function* () {
@@ -25,14 +25,14 @@ it.effect("configuration rejects unknown keys, invalid schedules, and destructiv
         ],
       },
     ]) {
-      yield* assert(
+      expect(
         Result.isFailure(
           yield* Schema.decodeUnknownEffect(Job, { onExcessProperty: "error" })(input).pipe(
             Effect.result,
           ),
         ),
         `unsafe config must fail: ${JSON.stringify(input)}`,
-      );
+      ).toBe(true);
     }
     yield* Schema.decodeUnknownEffect(Job)({
       ...fixture,
@@ -53,10 +53,10 @@ it.effect("Proton folders validate every segment including one-character names",
       "/my-files/a\\",
       "/my-files/a\0",
     ]) {
-      yield* assert(
+      expect(
         Result.isFailure(yield* Schema.decodeEffect(RemoteFolder)(folder).pipe(Effect.result)),
         "unsafe folder must fail",
-      );
+      ).toBe(true);
     }
   }),
 );
@@ -69,7 +69,7 @@ it.effect("Gitea URLs reject credentials, queries, and fragments", () =>
       "https://example.com/#fragment",
       "file:///source",
     ]) {
-      yield* assert(
+      expect(
         Result.isFailure(
           yield* Schema.decodeUnknownEffect(Job)({
             ...fixture,
@@ -77,7 +77,7 @@ it.effect("Gitea URLs reject credentials, queries, and fragments", () =>
           }).pipe(Effect.result),
         ),
         "unsafe URL must fail",
-      );
+      ).toBe(true);
     }
     yield* Schema.decodeUnknownEffect(Job)({
       ...fixture,

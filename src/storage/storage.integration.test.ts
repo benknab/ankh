@@ -1,9 +1,9 @@
-import { it } from "@effect/vitest";
+import { expect, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Ref, Schema } from "effect";
 import { Job } from "#domain/model.ts";
 import { Storage, withLock } from "#storage/storage.ts";
 import { infrastructure } from "#testing/infrastructure.ts";
-import { assert, fixture } from "#testing/fixtures.ts";
+import { fixture } from "#testing/fixtures.ts";
 
 it.live("concurrent scheduled jobs wait for the shared drive lock", () =>
   Effect.gen(function* () {
@@ -34,15 +34,15 @@ it.live("concurrent scheduled jobs wait for the shared drive lock", () =>
       }).pipe(Effect.scoped),
     );
     yield* Effect.sleep("100 millis");
-    yield* assert(!(yield* Ref.get(acquired)), "another job must not enter while lock is held");
+    expect(!(yield* Ref.get(acquired)), "another job must not enter while lock is held").toBe(true);
     yield* Deferred.succeed(release, undefined);
     yield* Fiber.join(first);
     yield* Fiber.join(second);
-    yield* assert(yield* Ref.get(acquired), "waiting job must acquire released lock");
-    yield* assert(
+    expect(yield* Ref.get(acquired), "waiting job must acquire released lock").toBe(true);
+    expect(
       !(yield* fs.exists(path.join(root, ".runner-lock"))),
       "both scopes must release the lock",
-    );
+    ).toBe(true);
   }).pipe(Effect.provide(infrastructure)),
 );
 
@@ -58,9 +58,9 @@ it.live("interrupting a lock waiter leaves the holder's lock intact", () =>
     const waiter = yield* Effect.forkChild(withLock(job).pipe(Effect.scoped));
     yield* Effect.sleep("100 millis");
     yield* Fiber.interrupt(waiter).pipe(Effect.timeout("1 second"));
-    yield* assert(
+    expect(
       yield* fs.exists(path.join(root, ".runner-lock")),
       "interrupted contender must not remove the holder's lock",
-    );
+    ).toBe(true);
   }).pipe(Effect.provide(infrastructure)),
 );

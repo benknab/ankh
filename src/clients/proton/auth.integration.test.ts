@@ -1,11 +1,10 @@
-import { it } from "@effect/vitest";
+import { expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 import { login } from "#clients/proton/auth.ts";
 import { Commands } from "#process/commands.ts";
 import { protonEnvironment } from "#clients/proton/state.ts";
 import { Storage } from "#storage/storage.ts";
 import { infrastructure } from "#testing/infrastructure.ts";
-import { assert } from "#testing/fixtures.ts";
 
 it.live("Proton credential setup creates a usable encryption key", () =>
   Effect.gen(function* () {
@@ -36,10 +35,10 @@ it.live("Proton credential setup creates a usable encryption key", () =>
     const decrypted = yield* commands.run("gpg", ["--batch", "--decrypt", "/proton/probe.gpg"], {
       env: protonEnvironment,
     });
-    yield* assert(
+    expect(
       decrypted === "credential-round-trip",
       "session encryption key must support decryption",
-    );
+    ).toBe(true);
     // A second login setup must reuse the existing key and store.
     yield* login().pipe(Effect.provideService(Commands, testCommands));
   }).pipe(Effect.provide(infrastructure)),

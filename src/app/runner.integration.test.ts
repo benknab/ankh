@@ -1,4 +1,4 @@
-import { it } from "@effect/vitest";
+import { expect, it } from "@effect/vitest";
 import { Effect, HashSet, Layer, Ref, Result, Schema } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { Commands } from "#process/commands.ts";
@@ -10,7 +10,7 @@ import { runJob } from "#app/runner.ts";
 import { Sources } from "#sources/sources.ts";
 import { Storage } from "#storage/storage.ts";
 import { outboxInfrastructure } from "#testing/infrastructure.ts";
-import { assert, fixture } from "#testing/fixtures.ts";
+import { fixture } from "#testing/fixtures.ts";
 
 it.live("real SQLite and Restic survive Proton failure, then retry and restore both copies", () =>
   Effect.gen(function* () {
@@ -80,25 +80,27 @@ it.live("real SQLite and Restic survive Proton failure, then retry and restore b
       runJob(jobFile, action).pipe(Effect.provide(adapters));
     yield* run("init");
     const failed = yield* run("backup").pipe(Effect.result);
-    yield* assert(Result.isFailure(failed), "offline Proton must fail the whole job");
+    expect(Result.isFailure(failed), "offline Proton must fail the whole job").toBe(true);
     const env = { RESTIC_REPOSITORY: repository, RESTIC_PASSWORD_FILE: password };
     const snapshots = yield* commands.run("restic", ["snapshots", "--json"], { env });
-    yield* assert(snapshots.includes("test-host"), "Restic snapshot must survive Proton failure");
+    expect(snapshots.includes("test-host"), "Restic snapshot must survive Proton failure").toBe(
+      true,
+    );
     yield* Ref.set(online, true);
     // A retry must not depend on the source still being available.
     yield* fs.remove(source);
     yield* run("retry");
-    yield* assert(
+    expect(
       (yield* fs.readDirectory(path.join(root, "outbox"))).length === 0,
       "retry should acknowledge the pending pair",
-    );
+    ).toBe(true);
     const restored = path.join(root, "restored");
     yield* commands.run("restic", ["restore", "latest", "--target", restored], { env });
     const value = yield* commands.run("sqlite3", [
       path.join(restored, "staging/test-job/test.db"),
       "SELECT value FROM records;",
     ]);
-    yield* assert(value === "verified", "Restic must restore the staged database");
+    expect(value === "verified", "Restic must restore the staged database").toBe(true);
     const archive = (yield* fs.readDirectory(remote)).find((name) => name.endsWith(".tar.zst"));
     if (!archive) {
       return yield* Effect.die("No uploaded archive");
@@ -116,10 +118,10 @@ it.live("real SQLite and Restic survive Proton failure, then retry and restore b
       path.join(remote, "test-job/test.db"),
       "SELECT value FROM records;",
     ]);
-    yield* assert(offsite === "verified", "Proton archive must restore the same database");
-    yield* assert(
+    expect(offsite === "verified", "Proton archive must restore the same database").toBe(true);
+    expect(
       !(yield* fs.exists(path.join(root, ".runner-lock"))),
       "scope must release drive lock after failure and success",
-    );
+    ).toBe(true);
   }).pipe(Effect.provide(outboxInfrastructure)),
 );

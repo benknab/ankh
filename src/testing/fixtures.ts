@@ -1,5 +1,3 @@
-import { Effect } from "effect";
-
 export const fixture = {
   version: 1,
   name: "test-job",
@@ -20,6 +18,3 @@ export const fixture = {
   ],
   retention: { daily: 14, weekly: 8, monthly: 12, yearly: 5 },
 };
-
-export const assert = (condition: boolean, message: string) =>
-  condition ? Effect.void : Effect.die(message);
