@@ -17,4 +17,5 @@ export const fixture = {
     },
   ],
   retention: { daily: 14, weekly: 8, monthly: 12, yearly: 5 },
+  schedule: { cron: "30 3 * * *", timeZone: "UTC" },
 };

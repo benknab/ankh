@@ -19,30 +19,36 @@ import { Sources } from "#sources/sources.ts";
 import { Destinations } from "#destinations/destinations.ts";
 
 for (const [season, utcHour] of [
-  ["2026-09-20", "03"],
-  ["2026-12-20", "03"],
+  ["2026-09-20", "04"],
+  ["2026-12-20", "04"],
 ] as const) {
-  it.effect(`Effect scheduler runs at 03:30 UTC on ${season} and survives failure`, () =>
-    Effect.gen(function* () {
-      const before = DateTime.toEpochMillis(DateTime.makeUnsafe(`${season}T${utcHour}:29:00Z`));
-      yield* TestClock.setTime(before);
-      const attempts = yield* Ref.make(0);
-      const backup = Ref.updateAndGet(attempts, (n) => n + 1).pipe(
-        Effect.flatMap((n) =>
-          n === 1 ? Effect.fail(BackupError.make({ message: "offline" })) : Effect.void,
-        ),
-      );
-      const fiber = yield* Effect.forkChild(scheduledAttempts(backup));
-      yield* TestClock.adjust("59 seconds");
-      expect(yield* Ref.get(attempts), "must wait for scheduled time, not run on startup").toBe(0);
-      yield* TestClock.adjust("1 second");
-      expect(yield* Ref.get(attempts), "must run at 03:30 local time").toBe(1);
-      yield* TestClock.adjust("24 hours");
-      expect(yield* Ref.get(attempts), "a failed job must not stop the next day's schedule").toBe(
-        2,
-      );
-      yield* Fiber.interrupt(fiber);
-    }),
+  it.effect(
+    `Effect scheduler runs at the configured 04:15 UTC on ${season} and survives failure`,
+    () =>
+      Effect.gen(function* () {
+        const before = DateTime.toEpochMillis(DateTime.makeUnsafe(`${season}T${utcHour}:14:00Z`));
+        yield* TestClock.setTime(before);
+        const attempts = yield* Ref.make(0);
+        const backup = Ref.updateAndGet(attempts, (n) => n + 1).pipe(
+          Effect.flatMap((n) =>
+            n === 1 ? Effect.fail(BackupError.make({ message: "offline" })) : Effect.void,
+          ),
+        );
+        const fiber = yield* Effect.forkChild(
+          scheduledAttempts(backup, { cron: "15 4 * * *", timeZone: "UTC" }),
+        );
+        yield* TestClock.adjust("59 seconds");
+        expect(yield* Ref.get(attempts), "must wait for scheduled time, not run on startup").toBe(
+          0,
+        );
+        yield* TestClock.adjust("1 second");
+        expect(yield* Ref.get(attempts), "must run at the configured time").toBe(1);
+        yield* TestClock.adjust("24 hours");
+        expect(yield* Ref.get(attempts), "a failed job must not stop the next day's schedule").toBe(
+          2,
+        );
+        yield* Fiber.interrupt(fiber);
+      }),
   );
 }
 

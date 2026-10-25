@@ -61,6 +61,24 @@ it.effect("configuration rejects unknown keys, invalid schedules, and destructiv
   }),
 );
 
+it.effect("every job requires an explicit cron expression and time zone", () =>
+  Effect.gen(function* () {
+    const { schedule, ...withoutSchedule } = fixture;
+    const job = yield* Schema.decodeUnknownEffect(Job)(fixture);
+    expect(job.schedule).toEqual(schedule);
+    for (const input of [
+      withoutSchedule,
+      { ...fixture, schedule: null },
+      { ...fixture, schedule: {} },
+      { ...fixture, schedule: { cron: schedule.cron } },
+      { ...fixture, schedule: { timeZone: schedule.timeZone } },
+    ]) {
+      const result = yield* Schema.decodeUnknownEffect(Job)(input).pipe(Effect.result);
+      expect(Result.isFailure(result), "missing schedule fields must fail validation").toBe(true);
+    }
+  }),
+);
+
 it.effect("Proton folders validate every segment including one-character names", () =>
   Effect.gen(function* () {
     for (const folder of ["/my-files/a", "/my-files/Backups/host/job"]) {

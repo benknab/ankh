@@ -1,12 +1,12 @@
 import { type Cron, Effect, Schedule } from "effect";
-import { type AbsolutePath, defaultSchedule, type JobSchedule } from "#domain/model.ts";
+import type { AbsolutePath, JobSchedule } from "#domain/model.ts";
 import { runJob } from "#app/runner.ts";
 import { loadJob } from "#storage/storage.ts";
 import { describeJob, track, withExecution } from "#telemetry/execution.ts";
 
 export const scheduledAttempts = <E, R>(
   backup: Effect.Effect<void, E, R>,
-  schedule: JobSchedule = defaultSchedule,
+  schedule: JobSchedule,
 ): Effect.Effect<void, Cron.CronParseError, R> =>
   backup.pipe(
     Effect.ignore,
@@ -19,7 +19,7 @@ export const serve = Effect.fn("Scheduler.serve")(function* (file: AbsolutePath)
     "schedule",
     track("configuration", loadJob(file)).pipe(Effect.tap(describeJob)),
   );
-  const schedule = job.schedule ?? defaultSchedule;
+  const { schedule } = job;
   yield* Effect.logDebug("Backup scheduler ready", {
     job: job.name,
     ...schedule,

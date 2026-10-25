@@ -115,7 +115,6 @@ export const JobSchedule = Schema.Struct({
   ),
 );
 export type JobSchedule = typeof JobSchedule.Type;
-export const defaultSchedule: JobSchedule = { cron: "30 3 * * *", timeZone: "UTC" };
 
 const overlaps = (a: string, b: string): boolean =>
   a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
@@ -137,7 +136,7 @@ export const Job = Schema.Struct({
     ),
   ),
   retention: Retention,
-  schedule: Schema.optionalKey(JobSchedule),
+  schedule: JobSchedule,
 }).check(
   Schema.makeFilter(
     (job) => {

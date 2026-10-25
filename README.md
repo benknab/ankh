@@ -12,7 +12,7 @@ sets. The source is available under the MIT license as a starting point for fork
 ## Architecture
 
 A **job** is a JSON file that defines one source, one or both destinations,
-retention counts, and an optional schedule. A **source adapter** prepares a local
+retention counts, and a required schedule. A **source adapter** prepares a local
 copy in `/staging/<job-name>`. A **destination adapter** stores that copy.
 
 The source is staged once per backup. Each configured destination is then
@@ -112,8 +112,9 @@ pairs and remote pair names, not remote file contents.
 
 The `retry` command uploads pending Proton pairs without staging the source. The
 `schedule` command stays running and starts backups at the job's cron times in
-its configured time zone. Its default is 03:30 UTC each day. Schedule changes
-require a restart. Each command accepts an optional absolute job-file path;
+its configured time zone. Every job must specify `schedule.cron` and
+`schedule.timeZone`; there is no default schedule. Schedule changes require a
+restart. Each command accepts an optional absolute job-file path;
 the default is `/job/backup.job.json`.
 
 ### Proton Drive
