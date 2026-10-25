@@ -1,4 +1,10 @@
 services:
+  toolchain:
+    build:
+      context: ..
+      target: base
+    platform: linux/amd64
+
   postgres-test:
     image: postgres:15.19-bookworm@sha256:22c6356b2897cb0b4be6ad550b44ff97a0f29df7dbe327c01bc3c84bd457694d
     platform: linux/amd64
@@ -15,7 +21,9 @@ services:
   integration:
     build:
       context: ..
-      target: test
+      dockerfile: tests/Dockerfile
+      additional_contexts:
+        backup-runner-toolchain: service:toolchain
     platform: linux/amd64
     depends_on:
       postgres-test:

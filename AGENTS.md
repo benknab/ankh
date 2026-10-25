@@ -63,9 +63,10 @@ files being changed; the generated lockfile is excluded.
 - Put tests using real processes, filesystems, databases, or external tools in
   `tests/**/*.integration.test.ts`. Do not gate tests with environment variables.
 - `pnpm test:integration` requires a running Docker daemon and Compose. It builds
-  the Dockerfile's `test` target, starts a disposable PostgreSQL service, waits for
-  readiness, and runs every integration test in the Linux/amd64 container. Data
-  and credentials live in temporary filesystems; each run has its own Compose
+  `tests/Dockerfile` using the root Dockerfile's shared `base` toolchain, starts a
+  disposable PostgreSQL service, waits for readiness, and runs every integration
+  test in the Linux/amd64 container. Data and credentials live in temporary
+  filesystems; each run has its own Compose
   project. Cleanup runs on success, failure, or interruption.
 - Pass file filters or Vitest options to that script to target tests, for example
   `pnpm test:integration tests/postgres.integration.test.ts`.
