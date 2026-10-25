@@ -7,7 +7,7 @@ import { Outbox } from "#outbox/outbox.ts";
 import { ProtonDrive } from "#clients/proton/client.ts";
 import { Sources } from "#sources/sources.ts";
 import { Storage } from "#storage/storage.ts";
-import { Logging } from "#telemetry/logging.ts";
+import { Telemetry } from "#telemetry/otlp.ts";
 
 const platform = Layer.mergeAll(NodeServices.layer, FetchHttpClient.layer);
 const infrastructure = Layer.mergeAll(Commands.layer, Storage.layer).pipe(
@@ -16,4 +16,8 @@ const infrastructure = Layer.mergeAll(Commands.layer, Storage.layer).pipe(
 const adapters = Layer.mergeAll(Outbox.layer, ProtonDrive.layer, Sources.layer).pipe(
   Layer.provideMerge(infrastructure),
 );
-export const Live = Destinations.layer.pipe(Layer.provideMerge(adapters), Layer.merge(Logging));
+const telemetry = Telemetry.pipe(Layer.provide(FetchHttpClient.layer));
+export const Live = Destinations.layer.pipe(
+  Layer.provideMerge(adapters),
+  Layer.provideMerge(telemetry),
+);
