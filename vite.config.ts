@@ -25,6 +25,7 @@ export default defineConfig({
         }).map((name) => [name, "off"] as const),
       ),
       ...recommended.rules,
+      "effecttsgo/unstable-api-usage": "off",
     },
   },
 });
