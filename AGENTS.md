@@ -38,6 +38,9 @@ Do not use v3 examples or a separate copy of Effect documentation.
   backup command, Git/LFS, Restic, tar/zstd, GPG/pass, and the official Proton
   CLI remain external tools; do not reimplement their protocols.
 - Use test layers to exercise failures without credentials or production mounts.
+- Write Effect tests with `it.effect` from `@effect/vitest`; use `it.live` for
+  real subprocess and integration tests. Both manage the test scope. Use the
+  provided `TestClock` in `it.effect` rather than starting a separate runtime.
 
 ## Checks
 
