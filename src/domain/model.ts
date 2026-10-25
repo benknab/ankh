@@ -1,4 +1,4 @@
-import { Array, Brand, Cron, HashSet, Redacted, Result, Schema } from "effect";
+import { Array, Brand, Cron, Effect, HashSet, Redacted, Result, Schema } from "effect";
 
 export class BackupError extends Schema.TaggedError<
   BackupError,
@@ -101,7 +101,7 @@ export type Destination = typeof Destination.Type;
 
 export const JobSchedule = Schema.Struct({
   cron: Schema.String,
-  timeZone: Schema.String,
+  timeZone: Schema.String.pipe(Schema.withDecodingDefaultKey(Effect.succeed("UTC"))),
 }).check(
   Schema.makeFilter(
     (schedule) => {

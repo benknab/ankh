@@ -61,16 +61,21 @@ it.effect("configuration rejects unknown keys, invalid schedules, and destructiv
   }),
 );
 
-it.effect("every job requires an explicit cron expression and time zone", () =>
+it.effect("every job requires a cron expression and defaults an omitted time zone to UTC", () =>
   Effect.gen(function* () {
     const { schedule, ...withoutSchedule } = fixture;
     const job = yield* Schema.decodeUnknownEffect(Job)(fixture);
     expect(job.schedule).toEqual(schedule);
+    const defaulted = yield* Schema.decodeUnknownEffect(Job)({
+      ...fixture,
+      schedule: { cron: schedule.cron },
+    });
+    expect(defaulted.schedule).toEqual({ cron: schedule.cron, timeZone: "UTC" });
     for (const input of [
       withoutSchedule,
       { ...fixture, schedule: null },
       { ...fixture, schedule: {} },
-      { ...fixture, schedule: { cron: schedule.cron } },
+      { ...fixture, schedule: { cron: schedule.cron, timeZone: null } },
       { ...fixture, schedule: { timeZone: schedule.timeZone } },
     ]) {
       const result = yield* Schema.decodeUnknownEffect(Job)(input).pipe(Effect.result);
