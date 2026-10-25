@@ -112,8 +112,8 @@ pairs and remote pair names, not remote file contents.
 
 The `retry` command uploads pending Proton pairs without staging the source. The
 `schedule` command stays running and starts backups at the job's cron times in
-its configured time zone. Every job must specify `schedule.cron` and
-`schedule.timeZone`; there is no default schedule. Schedule changes require a
+its configured time zone. Every job must specify `schedule.cron`;
+`schedule.timeZone` is optional and defaults to `UTC`. Schedule changes require a
 restart. Each command accepts an optional absolute job-file path;
 the default is `/job/backup.job.json`.
 
