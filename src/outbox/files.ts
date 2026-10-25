@@ -21,10 +21,6 @@ const readEntry = Effect.fn("Outbox.readEntry")(function* (
   destination: Proton,
   entry: string,
 ) {
-  if (entry.startsWith(".retired-") || entry.startsWith(".ack-")) {
-    yield* retire(job, destination, entry);
-    return Option.none<Archive>();
-  }
   const { path } = yield* Storage;
   const legacy = entry.endsWith(".tar.zst");
   const name = legacy ? entry : `${entry}.tar.zst`;
@@ -43,6 +39,14 @@ const readEntry = Effect.fn("Outbox.readEntry")(function* (
 export const list = Effect.fn("Outbox.list")(function* (job: Job, destination: Proton) {
   const { fs } = yield* Storage;
   yield* privateDirectory(destination.outbox);
+  yield* Effect.forEach(
+    yield* fs.readDirectory(destination.outbox),
+    (entry) =>
+      entry.startsWith(".retired-") || entry.startsWith(".ack-")
+        ? retire(job, destination, entry)
+        : Effect.void,
+    { discard: true },
+  );
   const entries = Array.sort(yield* fs.readDirectory(destination.outbox), String.Order);
   return Array.getSomes(
     yield* Effect.forEach(entries, (entry) => readEntry(job, destination, entry)),

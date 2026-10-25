@@ -89,9 +89,10 @@ it.live("durable outbox survives failure, retries through Queue, and restores SQ
   }).pipe(Effect.provide(outboxInfrastructure)),
 );
 
-for (const legacy of [false, true]) {
+for (const interruption of ["directory", "archive", "checksum"] as const) {
+  const legacy = interruption !== "directory";
   it.live(
-    `outbox resumes interrupted ${legacy ? "legacy" : "directory"} acknowledgement without uploading again`,
+    `outbox resumes acknowledgement interrupted at ${interruption} removal without uploading again`,
     () =>
       Effect.gen(function* () {
         const storage = yield* Storage;
@@ -123,7 +124,11 @@ for (const legacy of [false, true]) {
           fs: {
             ...fs,
             remove: (file, options) =>
-              (legacy ? file.endsWith(".sha256") : path.basename(file).startsWith(".retired-"))
+              (
+                legacy
+                  ? file.endsWith(interruption === "archive" ? ".tar.zst" : ".sha256")
+                  : path.basename(file).startsWith(".retired-")
+              )
                 ? Effect.interrupt
                 : fs.remove(file, options),
           },
