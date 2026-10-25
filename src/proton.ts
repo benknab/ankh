@@ -13,6 +13,15 @@ export const protonEnvironment = {
   PROTON_DRIVE_LOG_LEVEL: "WARNING",
 };
 
+const Folders = Schema.fromJsonString(
+  Schema.Array(
+    Schema.Struct({
+      name: Schema.Struct({ ok: Schema.Literal(true), value: Schema.NonEmptyString }),
+      type: Schema.Literal("folder"),
+    }),
+  ),
+);
+
 export class ProtonDrive extends Context.Service<
   ProtonDrive,
   {
@@ -46,9 +55,14 @@ export class ProtonDrive extends Context.Service<
         let parent = "/my-files";
         for (const name of destination.remoteFolder.slice("/my-files/".length).split("/")) {
           const current = `${parent}/${name}`;
-          yield* run(["info", current]).pipe(
-            Effect.catch(() => run(["create-folder", parent, name])),
+          const folders = yield* Schema.decodeEffect(Folders)(
+            yield* run(["list", "--json", "--type", "folder", parent]),
+          ).pipe(
+            Effect.mapError(() => new BackupError({ message: "Invalid Proton folder listing" })),
           );
+          if (!folders.some((folder) => folder.name.value === name)) {
+            yield* run(["create-folder", parent, name]);
+          }
           parent = current;
         }
       });
@@ -78,11 +92,15 @@ export class ProtonDrive extends Context.Service<
       ) {
         for (const name of names) {
           const pair = [name, `${name}.sha256`];
-          yield* run([
-            "trash",
-            "--json",
-            ...pair.map((file) => `${destination.remoteFolder}/${file}`),
-          ]);
+          const existing = yield* list(destination);
+          const pending = pair.filter((file) => HashSet.has(existing, file));
+          if (pending.length > 0) {
+            yield* run([
+              "trash",
+              "--json",
+              ...pending.map((file) => `${destination.remoteFolder}/${file}`),
+            ]);
+          }
           const remaining = yield* list(destination);
           if (pair.some((file) => HashSet.has(remaining, file))) {
             return yield* new BackupError({

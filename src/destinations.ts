@@ -3,7 +3,8 @@ import { BackupError, type Destination, type DestinationRequest, type Job } from
 import { Commands } from "./commands.ts";
 import { Outbox } from "./outbox.ts";
 import { ProtonDrive } from "./proton.ts";
-import { expiredSnapshots, snapshotNames } from "./retention.ts";
+import { snapshotNames } from "./retention.ts";
+import { retainProton } from "./proton-retention.ts";
 import { runRestic } from "./restic.ts";
 import { Storage } from "./storage.ts";
 
@@ -27,9 +28,7 @@ const run = Effect.fn("Destinations.run")(function* (
   }
   if (action === "backup" || action === "retry") {
     yield* outbox.drain(job, destination, (archive) => proton.upload(destination, archive));
-    const snapshots = yield* snapshotNames(job.name, yield* proton.list(destination));
-    const expired = expiredSnapshots(snapshots, job.retention);
-    yield* proton.trash(destination, expired);
+    yield* retainProton(job, destination);
   } else if (action !== "init") {
     yield* outbox.check(job, destination);
     const snapshots = yield* snapshotNames(job.name, yield* proton.list(destination));
