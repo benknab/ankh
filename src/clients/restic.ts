@@ -80,7 +80,9 @@ export class ResticClient extends Context.Service<
   public static readonly layer = Layer.effect(
     ResticClient,
     Effect.gen(function* () {
-      const context = yield* Effect.context<Storage | Commands>();
+      const context = (yield* Effect.context<Storage | Commands>()).pipe(
+        Context.pick(Storage, Commands),
+      );
       return ResticClient.of({
         initialize: (destination) => initialize(destination).pipe(Effect.provide(context)),
         backup: (destination, snapshot) =>

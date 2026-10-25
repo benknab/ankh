@@ -48,7 +48,9 @@ export class ArchiveClient extends Context.Service<
   public static readonly layer = Layer.effect(
     ArchiveClient,
     Effect.gen(function* () {
-      const context = yield* Effect.context<Storage | Commands>();
+      const context = (yield* Effect.context<Storage | Commands>()).pipe(
+        Context.pick(Storage, Commands),
+      );
       return ArchiveClient.of({
         create: (stage, archive) =>
           create(stage, archive).pipe(

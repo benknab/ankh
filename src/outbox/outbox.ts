@@ -10,7 +10,7 @@ import {
 } from "#domain/model.ts";
 import { acknowledge, list } from "#outbox/files.ts";
 import { enqueue } from "#outbox/publish.ts";
-import type { Storage } from "#storage/storage.ts";
+import { Storage } from "#storage/storage.ts";
 import { track } from "#telemetry/execution.ts";
 
 const deliver = Effect.fn("Outbox.deliver")(function* (
@@ -71,7 +71,9 @@ export class Outbox extends Context.Service<
   public static readonly layer = Layer.effect(
     Outbox,
     Effect.gen(function* () {
-      const context = yield* Effect.context<ArchiveClient | Storage>();
+      const context = (yield* Effect.context<ArchiveClient | Storage>()).pipe(
+        Context.pick(ArchiveClient, Storage),
+      );
       const provide = <A, E>(
         effect: Effect.Effect<A, E, ArchiveClient | Storage>,
       ): Effect.Effect<A, BackupError> =>

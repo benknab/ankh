@@ -13,7 +13,7 @@ import {
 import { gitAdapter } from "#sources/gitea.ts";
 import { postgresAdapter } from "#sources/postgres.ts";
 import { sqliteAdapter } from "#sources/sqlite.ts";
-import type { Storage } from "#storage/storage.ts";
+import { Storage } from "#storage/storage.ts";
 
 const stage = Effect.fn("Sources.stage")(
   function* (job: Job) {
@@ -39,9 +39,9 @@ export class Sources extends Context.Service<
   public static readonly layer = Layer.effect(
     Sources,
     Effect.gen(function* () {
-      const context = yield* Effect.context<
+      const context = (yield* Effect.context<
         Storage | SqliteClient | PostgresClient | GiteaClient | GitClient
-      >();
+      >()).pipe(Context.pick(Storage, SqliteClient, PostgresClient, GiteaClient, GitClient));
       return Sources.of({ stage: (job) => stage(job).pipe(Effect.provide(context)) });
     }),
   ).pipe(

@@ -1,11 +1,11 @@
 import { Context, Effect, Layer } from "effect";
 import type { BackupError, Destination, DestinationRequest, Job } from "#domain/model.ts";
-import type { Outbox } from "#outbox/outbox.ts";
-import type { ProtonDrive } from "#clients/proton/client.ts";
+import { Outbox } from "#outbox/outbox.ts";
+import { ProtonDrive } from "#clients/proton/client.ts";
 import { ResticClient } from "#clients/restic.ts";
 import { protonAdapter } from "#destinations/proton.ts";
 import { resticAdapter } from "#destinations/restic.ts";
-import type { Storage } from "#storage/storage.ts";
+import { Storage } from "#storage/storage.ts";
 
 export class Destinations extends Context.Service<
   Destinations,
@@ -20,7 +20,9 @@ export class Destinations extends Context.Service<
   public static readonly layer = Layer.effect(
     Destinations,
     Effect.gen(function* () {
-      const context = yield* Effect.context<ResticClient | Storage | Outbox | ProtonDrive>();
+      const context = (yield* Effect.context<ResticClient | Storage | Outbox | ProtonDrive>()).pipe(
+        Context.pick(ResticClient, Storage, Outbox, ProtonDrive),
+      );
       const run = Effect.fn("Destinations.run")(function* (
         job: Job,
         destination: Destination,
