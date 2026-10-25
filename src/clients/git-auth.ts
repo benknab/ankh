@@ -15,21 +15,13 @@ export const gitOptions = (repository: GitRepository): Options => {
       LC_ALL: "C",
       GITEA_TOKEN_FILE: repository.tokenFile,
       GITEA_ORIGIN: origin,
-      GIT_CONFIG_COUNT: origin === "" ? "3" : "5",
+      GIT_CONFIG_COUNT: "3",
       GIT_CONFIG_KEY_0: "credential.helper",
       GIT_CONFIG_VALUE_0: "",
       GIT_CONFIG_KEY_1: "credential.useHttpPath",
       GIT_CONFIG_VALUE_1: "false",
       GIT_CONFIG_KEY_2: "http.followRedirects",
       GIT_CONFIG_VALUE_2: "false",
-      ...(origin === ""
-        ? {}
-        : {
-            GIT_CONFIG_KEY_3: "lfs.url",
-            GIT_CONFIG_VALUE_3: `${repository.url}/info/lfs`,
-            GIT_CONFIG_KEY_4: "remote.origin.lfsurl",
-            GIT_CONFIG_VALUE_4: `${repository.url}/info/lfs`,
-          }),
     },
   };
 };

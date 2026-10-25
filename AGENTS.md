@@ -38,7 +38,7 @@ Do not use v3 examples or a separate copy of Effect documentation.
 - Keep source adapters separate from destinations. Stage once, attempt all
   configured destinations, then report any failures.
 - Keep binary tool invocations behind the Commands service. SQLite's online
-  backup command, Git/LFS, Restic, tar/zstd, GPG/pass, and the official Proton
+  backup command, Git, Restic, tar/zstd, GPG/pass, and the official Proton
   CLI remain external tools; do not reimplement their protocols.
 - Use test layers to exercise failures without credentials or production mounts.
 - Use `#/` imports for local modules and Vitest `expect` matchers in tests.

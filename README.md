@@ -21,13 +21,16 @@ destination attempts. The command fails if staging or any destination fails.
 
 ### Source adapters
 
-| Type        | Staged content                                                                                                           |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `sqlite`    | One database, copied with SQLite's online backup command and checked with `PRAGMA quick_check`.                          |
-| `postgres`  | One database, exported with `pg_dump --format=custom` and read back with `pg_restore`.                                   |
-| `gitea-git` | Mirrors of repositories visible to the configured Gitea token, including Git LFS objects reachable from repository refs. |
+| Type        | Staged content                                                                                  |
+| ----------- | ----------------------------------------------------------------------------------------------- |
+| `sqlite`    | One database, copied with SQLite's online backup command and checked with `PRAGMA quick_check`. |
+| `postgres`  | One database, exported with `pg_dump --format=custom` and read back with `pg_restore`.          |
+| `gitea-git` | Git mirrors of repositories visible to the configured Gitea token.                              |
 
-The Gitea adapter copies Git data, not issues, attachments, account data, or server
+Git LFS is not supported. The Gitea adapter does not fetch or verify LFS objects;
+LFS pointer files remain ordinary Git blobs in the mirror and do not contain the
+referenced file data. Ankh is intended for small repositories, not large-file storage.
+The adapter also excludes issues, attachments, account data, and server
 configuration. The PostgreSQL adapter does not export cluster roles or other
 databases. There is no general file-directory source adapter.
 

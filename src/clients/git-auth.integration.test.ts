@@ -26,7 +26,7 @@ const server = Effect.fn("Test.server")(function* (
   return `http://127.0.0.1:${http.address.port}`;
 });
 
-it.live("repository LFS config cannot redirect the backup token", () =>
+it.live("Git mirrors skip LFS and keep token authentication on the origin", () =>
   Effect.gen(function* () {
     const { fs, path } = yield* Storage;
     const commands = yield* Commands;
@@ -35,10 +35,7 @@ it.live("repository LFS config cannot redirect the backup token", () =>
     const mirror = path.join(root, "mirror.git");
     const tokenFile = absolutePath(path.join(root, "token"));
     yield* fs.writeFileString(tokenFile, "synthetic-token");
-    const payload = "lfs-payload";
-    yield* fs.writeFileString(path.join(root, "payload"), payload);
-    const checksum = yield* commands.run("sha256sum", [path.join(root, "payload")]);
-    const oid = Redacted.value(checksum.stdout).slice(0, 64);
+    const pointer = `version https://git-lfs.github.com/spec/v1\noid sha256:${"a".repeat(64)}\nsize 123\n`;
     const attacks = yield* Ref.make(0);
     const stolen = yield* Ref.make(0);
     const redirect = yield* Ref.make(false);
@@ -56,8 +53,7 @@ it.live("repository LFS config cannot redirect the backup token", () =>
         });
       }),
     );
-    let trusted = "";
-    trusted = yield* server(
+    const trusted = yield* server(
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest;
         if (request.headers.authorization === undefined) {
@@ -76,14 +72,7 @@ it.live("repository LFS config cannot redirect the backup token", () =>
             headers: { location: `${attacker}/steal` },
           });
         }
-        if (request.url.endsWith("/objects/batch")) {
-          return yield* HttpServerResponse.json({
-            objects: [
-              { oid, size: payload.length, actions: { download: { href: `${trusted}/download` } } },
-            ],
-          }).pipe(Effect.orDie);
-        }
-        return HttpServerResponse.text(payload);
+        return HttpServerResponse.text(`${"b".repeat(40)}\trefs/heads/main\n`);
       }),
     );
     yield* commands.run("git", ["init", "--initial-branch=main", source]);
@@ -92,10 +81,7 @@ it.live("repository LFS config cannot redirect the backup token", () =>
       path.join(source, ".gitattributes"),
       "asset filter=lfs diff=lfs merge=lfs -text\n",
     );
-    yield* fs.writeFileString(
-      path.join(source, "asset"),
-      `version https://git-lfs.github.com/spec/v1\noid sha256:${oid}\nsize ${payload.length}\n`,
-    );
+    yield* fs.writeFileString(path.join(source, "asset"), pointer);
     yield* commands.run("git", [
       "-C",
       source,
@@ -138,26 +124,22 @@ it.live("repository LFS config cannot redirect the backup token", () =>
         Layer.merge(Layer.succeed(Storage, yield* Storage), Layer.succeed(Commands, localGit)),
       ),
     );
-    for (const existing of [false, true]) {
-      if (existing) {
-        yield* fs.remove(path.join(mirror, "lfs/objects"), { recursive: true });
-      }
+    for (let attempt = 0; attempt < 2; attempt += 1) {
       yield* Effect.gen(function* () {
         yield* (yield* GitClient).mirror(repository);
       }).pipe(Effect.provide(client));
-      expect(
-        yield* fs.readFileString(
-          path.join(mirror, "lfs/objects", oid.slice(0, 2), oid.slice(2, 4), oid),
-        ),
-      ).toBe(payload);
+      const blob = yield* commands.run("git", ["-C", mirror, "show", "HEAD:asset"]);
+      expect(Redacted.value(blob.stdout)).toBe(pointer);
+      expect(yield* fs.exists(path.join(mirror, "lfs"))).toBe(false);
     }
-    expect(yield* Ref.get(authenticated)).toBeGreaterThan(0);
+    expect(yield* Ref.get(authenticated)).toBe(0);
     expect(yield* Ref.get(attacks)).toBe(0);
+    yield* commands.run("git", ["ls-remote", repository.url], gitOptions(repository));
+    expect(yield* Ref.get(authenticated)).toBeGreaterThan(0);
     yield* Ref.set(redirect, true);
-    yield* fs.remove(path.join(mirror, "lfs/objects"), { recursive: true });
-    const redirected = yield* Effect.gen(function* () {
-      yield* (yield* GitClient).mirror(repository);
-    }).pipe(Effect.provide(client), Effect.result);
+    const redirected = yield* commands
+      .run("git", ["ls-remote", repository.url], gitOptions(repository))
+      .pipe(Effect.result);
     expect(Result.isFailure(redirected)).toBe(true);
     expect(yield* Ref.get(stolen)).toBe(0);
     const denied = yield* commands

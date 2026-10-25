@@ -12,7 +12,6 @@ RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
     ca-certificates \
     git \
-    git-lfs \
     gnupg \
     pass \
     restic \
