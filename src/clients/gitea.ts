@@ -1,0 +1,51 @@
+import { Context, Effect, Layer, Schema } from "effect";
+import { HttpClient, HttpClientResponse } from "effect/http";
+import { backupError, type BackupError, type Gitea } from "#domain/model.ts";
+import { Storage } from "#storage/storage.ts";
+
+const Repository = Schema.Struct({
+  full_name: Schema.String.check(
+    Schema.isPattern(/^[A-Za-z0-9_-][A-Za-z0-9_.-]*\/[A-Za-z0-9_-][A-Za-z0-9_.-]*$/u),
+  ),
+});
+const Repositories = Schema.Array(Repository);
+export type Repository = typeof Repository.Type;
+
+export class GiteaClient extends Context.Service<
+  GiteaClient,
+  {
+    readonly repositories: (
+      source: typeof Gitea.Type,
+    ) => Effect.Effect<readonly Repository[], BackupError>;
+  }
+>()("backup-runner/clients/gitea/GiteaClient") {
+  public static readonly layer = Layer.effect(
+    GiteaClient,
+    Effect.gen(function* () {
+      const client = (yield* HttpClient.HttpClient).pipe(HttpClient.filterStatusOk);
+      const { fs } = yield* Storage;
+      const repositories = Effect.fn("GiteaClient.repositories")(
+        function* (source: typeof Gitea.Type) {
+          const token = yield* Schema.decodeEffect(Schema.NonEmptyString)(
+            (yield* fs.readFileString(source.tokenFile)).trim(),
+          );
+          const base = source.apiUrl.href.replace(/\/$/u, "");
+          const result: Repository[] = [];
+          for (let page = 1; ; page += 1) {
+            const response = yield* client.get(`${base}/api/v1/user/repos`, {
+              headers: { Authorization: `token ${token}` },
+              urlParams: { limit: 50, page },
+            });
+            const batch = yield* HttpClientResponse.schemaBodyJson(Repositories)(response);
+            result.push(...batch);
+            if (batch.length < 50) {
+              return result;
+            }
+          }
+        },
+        Effect.mapError(backupError("Gitea repository discovery")),
+      );
+      return GiteaClient.of({ repositories });
+    }),
+  );
+}

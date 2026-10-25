@@ -1,6 +1,8 @@
 import { Context, Effect, Layer } from "effect";
-import { HttpClient } from "effect/http";
-import { Commands } from "#process/commands.ts";
+import { SqliteClient } from "#clients/sqlite.ts";
+import { PostgresClient } from "#clients/postgres.ts";
+import { GiteaClient } from "#clients/gitea.ts";
+import { GitClient } from "#clients/git.ts";
 import {
   type AbsolutePath,
   absolutePath,
@@ -8,21 +10,21 @@ import {
   backupError,
   type Job,
 } from "#domain/model.ts";
-import { stageGitea } from "#sources/gitea.ts";
-import { stagePostgres } from "#sources/postgres.ts";
-import { stageSqlite } from "#sources/sqlite.ts";
-import { Storage } from "#storage/storage.ts";
+import { gitAdapter } from "#sources/gitea.ts";
+import { postgresAdapter } from "#sources/postgres.ts";
+import { sqliteAdapter } from "#sources/sqlite.ts";
+import type { Storage } from "#storage/storage.ts";
 
 const stage = Effect.fn("Sources.stage")(
   function* (job: Job) {
     const directory = absolutePath(`/staging/${job.name}`);
     switch (job.source.type) {
       case "sqlite":
-        return yield* stageSqlite(job.source, directory);
+        return yield* sqliteAdapter.stage(job.source, directory);
       case "postgres":
-        return yield* stagePostgres(job.source, directory);
+        return yield* postgresAdapter.stage(job.source, directory);
       case "gitea-git":
-        return yield* stageGitea(job.source, directory);
+        return yield* gitAdapter.stage(job.source, directory);
     }
   },
   Effect.mapError(backupError("Source staging")),
@@ -33,12 +35,18 @@ export class Sources extends Context.Service<
   {
     readonly stage: (job: Job) => Effect.Effect<AbsolutePath, BackupError>;
   }
->()("backup-runner/Sources") {
-  static readonly layer = Layer.effect(
+>()("backup-runner/sources/sources") {
+  public static readonly layer = Layer.effect(
     Sources,
     Effect.gen(function* () {
-      const context = yield* Effect.context<Commands | Storage | HttpClient.HttpClient>();
+      const context = yield* Effect.context<
+        Storage | SqliteClient | PostgresClient | GiteaClient | GitClient
+      >();
       return Sources.of({ stage: (job) => stage(job).pipe(Effect.provide(context)) });
     }),
+  ).pipe(
+    Layer.provide(
+      Layer.mergeAll(SqliteClient.layer, PostgresClient.layer, GiteaClient.layer, GitClient.layer),
+    ),
   );
 }

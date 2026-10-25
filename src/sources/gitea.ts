@@ -1,73 +1,59 @@
-import { DateTime, Effect, Schema } from "effect";
-import { HttpClient, HttpClientResponse } from "effect/http";
-import { Commands, type Options } from "#process/commands.ts";
-import { type AbsolutePath, type Gitea } from "#domain/model.ts";
+import { Array, DateTime, Effect, Schema, String } from "effect";
+import { GiteaClient, type Repository } from "#clients/gitea.ts";
+import { GitClient } from "#clients/git.ts";
+import type { SourceAdapter } from "#domain/adapters.ts";
+import { type AbsolutePath, backupError, type Gitea } from "#domain/model.ts";
 import { privateDirectory, Storage } from "#storage/storage.ts";
 
-const Repositories = Schema.Array(
-  Schema.Struct({
-    full_name: Schema.String.check(
-      Schema.isPattern(/^[A-Za-z0-9_-][A-Za-z0-9_.-]*\/[A-Za-z0-9_-][A-Za-z0-9_.-]*$/),
-    ),
-  }),
+const Manifest = Schema.fromJsonString(
+  Schema.Struct({ createdAt: Schema.String, repositories: Schema.Array(Schema.String) }),
 );
 
-export const stageGitea = Effect.fn("Gitea.stage")(function* (
-  source: typeof Gitea.Type,
+const writeManifest = Effect.fn("Git.writeManifest")(function* (
   directory: AbsolutePath,
+  repositories: readonly Repository[],
 ) {
   const { fs, path } = yield* Storage;
-  const commands = yield* Commands;
-  const token = (yield* fs.readFileString(source.tokenFile)).trim();
-  yield* Schema.decodeEffect(Schema.NonEmptyString)(token);
-  const client = (yield* HttpClient.HttpClient).pipe(HttpClient.filterStatusOk);
-  const base = source.apiUrl.href.replace(/\/$/, "");
-  const repositories: Array<(typeof Repositories.Type)[number]> = [];
-  for (let page = 1; ; page++) {
-    const response = yield* client.get(`${base}/api/v1/user/repos`, {
-      headers: { Authorization: `token ${token}` },
-      urlParams: { limit: 50, page },
-    });
-    const batch = yield* HttpClientResponse.schemaBodyJson(Repositories)(response);
-    repositories.push(...batch);
-    if (batch.length < 50) {
-      break;
-    }
-  }
-  yield* privateDirectory(directory);
-  // Preserve the mirror cache; Git LFS uses askpass for Basic authentication.
-  const gitOptions: Options = {
-    output: "tail",
-    redact: [token],
-    env: {
-      GIT_ASKPASS: "/app/gitea-askpass.sh",
-      GIT_TERMINAL_PROMPT: "0",
-      GITEA_TOKEN_FILE: source.tokenFile,
-    },
-  };
-  for (const repository of repositories) {
-    const mirror = path.join(directory, "repositories", `${repository.full_name}.git`);
-    yield* privateDirectory(path.dirname(mirror));
-    if (yield* fs.exists(mirror)) {
-      yield* commands.run("git", ["-C", mirror, "remote", "update", "--prune"], gitOptions);
-    } else {
-      yield* commands.run(
-        "git",
-        ["clone", "--mirror", `${base}/${repository.full_name}.git`, mirror],
-        gitOptions,
-      );
-    }
-    yield* commands.run("git", ["-C", mirror, "lfs", "fetch", "--all", "origin"], gitOptions);
-    yield* commands.run("git", ["-C", mirror, "fsck", "--full"], gitOptions);
-  }
-  const manifest = yield* Schema.encodeEffect(
-    Schema.fromJsonString(
-      Schema.Struct({ createdAt: Schema.String, repositories: Schema.Array(Schema.String) }),
-    ),
-  )({
+  const manifest = yield* Schema.encodeEffect(Manifest)({
     createdAt: DateTime.formatIso(yield* DateTime.now),
-    repositories: repositories.map((r) => r.full_name).sort(),
+    repositories: Array.sort(
+      Array.map(repositories, (repository) => repository.full_name),
+      String.Order,
+    ),
   });
   yield* fs.writeFileString(path.join(directory, "manifest.json"), manifest);
-  return directory;
 });
+
+const mirrorRepositories = Effect.fn("Git.mirrorRepositories")(function* (
+  source: typeof Gitea.Type,
+  directory: AbsolutePath,
+  repositories: readonly Repository[],
+) {
+  const { path } = yield* Storage;
+  const git = yield* GitClient;
+  const base = source.apiUrl.href.replace(/\/$/u, "");
+  yield* privateDirectory(directory);
+  yield* Effect.forEach(
+    repositories,
+    (repository) =>
+      git.mirror({
+        url: `${base}/${repository.full_name}.git`,
+        mirror: path.join(directory, "repositories", `${repository.full_name}.git`),
+        tokenFile: source.tokenFile,
+      }),
+    { discard: true },
+  );
+});
+
+export const gitAdapter: SourceAdapter<typeof Gitea.Type, GiteaClient | GitClient | Storage> = {
+  stage: Effect.fn("Git.stage")(
+    function* (source: typeof Gitea.Type, directory: AbsolutePath) {
+      const client = yield* GiteaClient;
+      const repositories = yield* client.repositories(source);
+      yield* mirrorRepositories(source, directory, repositories);
+      yield* writeManifest(directory, repositories);
+      return directory;
+    },
+    Effect.mapError(backupError("Git staging")),
+  ),
+};
