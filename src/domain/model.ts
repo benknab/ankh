@@ -103,9 +103,16 @@ export const JobSchedule = Schema.Struct({
   cron: Schema.String,
   timeZone: Schema.String,
 }).check(
-  Schema.makeFilter((schedule) => Result.isSuccess(Cron.parse(schedule.cron, schedule.timeZone)), {
-    message: "Invalid cron expression or time zone",
-  }),
+  Schema.makeFilter(
+    (schedule) => {
+      const parsed = Cron.parse(schedule.cron, schedule.timeZone);
+      return (
+        Result.isSuccess(parsed) &&
+        Result.isSuccess(Result.try(() => Cron.next(parsed.success, "2000-01-01T00:00:00Z")))
+      );
+    },
+    { message: "Invalid cron expression, time zone, or calendar date" },
+  ),
 );
 export type JobSchedule = typeof JobSchedule.Type;
 export const defaultSchedule: JobSchedule = { cron: "30 3 * * *", timeZone: "UTC" };

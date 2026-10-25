@@ -1,8 +1,22 @@
 import { expect, it } from "@effect/vitest";
-import { DateTime, Effect, Fiber, Ref } from "effect";
+import {
+  DateTime,
+  Effect,
+  Fiber,
+  FileSystem,
+  Layer,
+  Logger,
+  Path,
+  Ref,
+  Result,
+  Schema,
+} from "effect";
 import { TestClock } from "effect/testing";
-import { BackupError } from "#domain/model.ts";
-import { scheduledAttempts } from "#app/scheduler.ts";
+import { absolutePath, BackupError } from "#domain/model.ts";
+import { scheduledAttempts, serve } from "#app/scheduler.ts";
+import { Storage } from "#storage/storage.ts";
+import { Sources } from "#sources/sources.ts";
+import { Destinations } from "#destinations/destinations.ts";
 
 for (const [season, utcHour] of [
   ["2026-09-20", "03"],
@@ -29,6 +43,57 @@ for (const [season, utcHour] of [
       );
       yield* Fiber.interrupt(fiber);
     }),
+  );
+}
+
+for (const missing of [true, false]) {
+  it.effect(
+    `scheduler emits a safe startup failure for ${missing ? "missing" : "invalid"} config`,
+    () =>
+      Effect.gen(function* () {
+        const messages: unknown[] = [];
+        const storage = Storage.layer.pipe(
+          Layer.provide(
+            Layer.mergeAll(
+              Path.layer,
+              FileSystem.layerNoop(
+                missing
+                  ? {}
+                  : {
+                      readFileString: (): Effect.Effect<string> =>
+                        Effect.succeed('{"secret":"must-not-escape"}'),
+                    },
+              ),
+            ),
+          ),
+        );
+        const result = yield* serve(absolutePath("/missing-must-not-escape.json")).pipe(
+          Effect.provideService(Sources, Sources.of({ stage: () => Effect.die("must not stage") })),
+          Effect.provideService(
+            Destinations,
+            Destinations.of({ run: () => Effect.die("must not back up") }),
+          ),
+          Effect.provide(
+            Layer.merge(
+              storage,
+              Logger.layer([
+                Logger.make(({ message }): void => {
+                  messages.push(message);
+                }),
+              ]),
+            ),
+          ),
+          Effect.result,
+        );
+        expect(Result.isFailure(result)).toBe(true);
+        expect(messages).toMatchObject([
+          [{ operation: "schedule", status: "failure", steps: { configuration: { failures: 1 } } }],
+        ]);
+        expect(messages).toHaveLength(1);
+        expect(
+          yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(messages),
+        ).not.toContain("must-not-escape");
+      }),
   );
 }
 

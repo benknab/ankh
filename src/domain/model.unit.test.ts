@@ -25,6 +25,7 @@ it.effect("configuration rejects unknown keys, invalid schedules, and destructiv
       { ...fixture, source: { ...fixture.source, ignored: true } },
       { ...fixture, retention: { ...fixture.retention, ignored: true } },
       { ...fixture, schedule: { cron: "invalid", timeZone: "UTC" } },
+      { ...fixture, schedule: { cron: "0 0 31 2 *", timeZone: "UTC" } },
       { ...fixture, schedule: { cron: "30 3 * * *", timeZone: "Invalid/Zone" } },
       { ...fixture, source: { ...fixture.source, path: "/staging/test-job/source.db" } },
       { ...fixture, source: { ...fixture.source, path: "/staging" } },
@@ -52,6 +53,10 @@ it.effect("configuration rejects unknown keys, invalid schedules, and destructiv
     yield* Schema.decodeUnknownEffect(Job)({
       ...fixture,
       schedule: { cron: "30 3 * * *", timeZone: "Europe/Paris" },
+    });
+    yield* Schema.decodeUnknownEffect(Job)({
+      ...fixture,
+      schedule: { cron: "0 0 29 2 *", timeZone: "UTC" },
     });
   }),
 );

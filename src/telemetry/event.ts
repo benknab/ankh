@@ -2,7 +2,7 @@ import { Cause, Exit, Option, Schema } from "effect";
 import { BackupError, type Action, type JobName } from "#domain/model.ts";
 import type { Messages } from "#telemetry/messages.ts";
 
-export type Operation = Action | "validate" | "proton-login";
+export type Operation = Action | "validate" | "proton-login" | "schedule";
 export type Step =
   | "configuration"
   | "source"
