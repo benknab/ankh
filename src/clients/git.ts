@@ -2,6 +2,7 @@ import { Array, Context, Effect, Layer, Option, Redacted, Schema } from "effect"
 import { type AbsolutePath, backupError, type BackupError } from "#domain/model.ts";
 import { Commands, type Options } from "#process/commands.ts";
 import { privateDirectory, Storage } from "#storage/storage.ts";
+import { verifyLfs } from "#clients/git-lfs.ts";
 
 export interface GitRepository {
   readonly url: string;
@@ -79,6 +80,9 @@ export class GitClient extends Context.Service<
           );
           yield* commands.run("git", ["-C", repository.mirror, "fsck", "--full"], options);
           yield* syncHead(repository, options).pipe(Effect.provideService(Commands, commands));
+          yield* verifyLfs(repository.mirror, options).pipe(
+            Effect.provideService(Commands, commands),
+          );
         },
         Effect.mapError(backupError("Git mirror")),
       );

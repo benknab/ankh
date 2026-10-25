@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { Array, Effect, Layer, Schema } from "effect";
+import { Array, Effect, Layer, Redacted, Result, Schema } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
 import { Commands } from "#process/commands.ts";
 import { Job } from "#domain/model.ts";
@@ -28,6 +28,10 @@ it.live("Gitea staging updates a persistent mirror and restores Git and LFS cont
     yield* fs.writeFileString(path.join(repository, "README"), "first revision");
     yield* git(["add", "."]);
     yield* git(["commit", "-m", "Initial test fixture"]);
+    const listing = yield* git(["lfs", "ls-files", "--long"]);
+    const oldOid = yield* Schema.decodeEffect(
+      Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/u)),
+    )(Redacted.value(listing.stdout).slice(0, 64));
     const tokenFile = path.join(root, "token");
     yield* fs.writeFileString(tokenFile, "synthetic-token");
     const job = yield* Schema.decodeUnknownEffect(Job)({
@@ -87,9 +91,23 @@ it.live("Gitea staging updates a persistent mirror and restores Git and LFS cont
     }).pipe(Effect.provide(sources));
     yield* stage;
     yield* fs.writeFileString(path.join(repository, "README"), "second revision");
+    yield* fs.writeFileString(path.join(repository, "asset.bin"), "new-lfs-data".repeat(1024));
     yield* git(["add", "."]);
     yield* git(["commit", "-m", "Update test fixture"]);
     const directory = yield* stage;
+    const historicalObject = path.join(
+      directory,
+      "repositories/example/repository.git/lfs/objects",
+      oldOid.slice(0, 2),
+      oldOid.slice(2, 4),
+      oldOid,
+    );
+    yield* fs.writeFileString(historicalObject, "bad-data".repeat(1024));
+    const corrupt = yield* stage.pipe(Effect.result);
+    expect(Result.isFailure(corrupt), "historical LFS corruption must fail staging").toBe(true);
+    // LFS fsck quarantines corruption; the next fetch must restore the missing payload.
+    yield* stage;
+    expect(yield* fs.readFileString(historicalObject)).toBe("lfs-data".repeat(1024));
     const restored = path.join(root, "restored");
     yield* commands.run(
       "git",
@@ -104,6 +122,6 @@ it.live("Gitea staging updates a persistent mirror and restores Git and LFS cont
     expect(
       yield* fs.readFileString(path.join(restored, "asset.bin")),
       "LFS objects must restore",
-    ).toBe("lfs-data".repeat(1024));
+    ).toBe("new-lfs-data".repeat(1024));
   }).pipe(Effect.provide(infrastructure)),
 );
