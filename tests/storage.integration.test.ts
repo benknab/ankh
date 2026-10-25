@@ -45,3 +45,22 @@ it.live("concurrent scheduled jobs wait for the shared drive lock", () =>
     );
   }).pipe(Effect.provide(infrastructure)),
 );
+
+it.live("interrupting a lock waiter leaves the holder's lock intact", () =>
+  Effect.gen(function* () {
+    const { fs, path } = yield* Storage;
+    const root = yield* fs.makeTempDirectoryScoped();
+    const job = yield* Schema.decodeUnknownEffect(Job)({
+      ...fixture,
+      backupDrive: { ...fixture.backupDrive, sentinelFile: path.join(root, ".sentinel") },
+    });
+    yield* withLock(job);
+    const waiter = yield* Effect.forkChild(withLock(job).pipe(Effect.scoped));
+    yield* Effect.sleep("100 millis");
+    yield* Fiber.interrupt(waiter).pipe(Effect.timeout("1 second"));
+    yield* assert(
+      yield* fs.exists(path.join(root, ".runner-lock")),
+      "interrupted contender must not remove the holder's lock",
+    );
+  }).pipe(Effect.provide(infrastructure)),
+);

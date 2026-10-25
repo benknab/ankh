@@ -62,20 +62,19 @@ export const privateDirectory = Effect.fn("privateDirectory")(function* (directo
 export const withLock = Effect.fn("withLock")(function* (job: Job) {
   const { fs, path } = yield* Storage;
   const directory = path.join(path.dirname(job.backupDrive.sentinelFile), ".runner-lock");
-  yield* Effect.acquireRelease(
-    fs.makeDirectory(directory, { mode: 0o700 }).pipe(
-      Effect.retry({
-        schedule: Schedule.spaced("10 seconds"),
-        times: 2160,
-        while: (error) => error.reason._tag === "AlreadyExists",
-      }),
-      Effect.mapError(
-        () =>
-          new BackupError({
-            message: `Cannot acquire ${directory}; check the drive and any active run or stale lock`,
-          }),
-      ),
+  yield* Effect.acquireRelease(fs.makeDirectory(directory, { mode: 0o700 }), () =>
+    fs.remove(directory, { recursive: true }).pipe(Effect.orDie),
+  ).pipe(
+    Effect.retry({
+      schedule: Schedule.spaced("10 seconds"),
+      times: 2160,
+      while: (error) => error.reason._tag === "AlreadyExists",
+    }),
+    Effect.mapError(
+      () =>
+        new BackupError({
+          message: `Cannot acquire ${directory}; check the drive and any active run or stale lock`,
+        }),
     ),
-    () => fs.remove(directory, { recursive: true }).pipe(Effect.orDie),
   );
 });

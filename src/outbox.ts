@@ -1,4 +1,15 @@
-import { Cause, Context, DateTime, Effect, Layer, Option, Queue, Schema, Stream } from "effect";
+import {
+  Cause,
+  Context,
+  DateTime,
+  Effect,
+  Layer,
+  Option,
+  Queue,
+  Result,
+  Schema,
+  Stream,
+} from "effect";
 import { Commands } from "./commands.ts";
 import {
   type AbsolutePath,
@@ -41,6 +52,18 @@ const list = Effect.fn("Outbox.list")(function* (job: Job, destination: Proton) 
   const entries = yield* fs.readDirectory(destination.outbox);
   const archives: Archive[] = [];
   for (const entry of entries.sort()) {
+    if (entry.startsWith(".retired-") || entry.startsWith(".ack-")) {
+      const legacy = entry.startsWith(".ack-");
+      const name = legacy ? entry.slice(5) : `${entry.slice(9)}.tar.zst`;
+      if (Option.isSome(archiveTime(job.name, name))) {
+        if (legacy) {
+          yield* fs.remove(path.join(destination.outbox, name), { force: true });
+          yield* fs.remove(path.join(destination.outbox, `${name}.sha256`), { force: true });
+        }
+        yield* fs.remove(path.join(destination.outbox, entry), { recursive: true, force: true });
+      }
+      continue;
+    }
     const legacy = entry.endsWith(".tar.zst");
     const name = legacy ? entry : `${entry}.tar.zst`;
     if (Option.isNone(archiveTime(job.name, name))) {
@@ -70,50 +93,61 @@ const enqueue = Effect.fn("Outbox.enqueue")(function* (
   const commands = yield* Commands;
   yield* privateDirectory(destination.outbox);
   const name = archiveName(job.name, yield* DateTime.now);
-  const temporary = yield* Effect.acquireRelease(
+  yield* Effect.acquireUseRelease(
     fs.makeTempDirectory({
       directory: destination.outbox,
       prefix: ".partial-",
     }),
-    (directory) => fs.remove(directory, { recursive: true, force: true }).pipe(Effect.orDie),
+    (temporary) =>
+      Effect.gen(function* () {
+        const file = absolutePath(path.join(temporary, name));
+        // GNU tar streams to zstd; the outbox never needs an uncompressed tar copy.
+        yield* commands.run("tar", [
+          "--use-compress-program=zstd",
+          "--create",
+          "--file",
+          file,
+          "--directory",
+          path.dirname(stage),
+          path.basename(stage),
+        ]);
+        yield* fs.chmod(file, 0o600);
+        const output = yield* commands.run("sha256sum", [name], { cwd: temporary });
+        yield* fs.writeFileString(`${file}.sha256`, `${output}\n`, { mode: 0o600 });
+        yield* verify({
+          name,
+          file,
+          checksum: absolutePath(`${file}.sha256`),
+          directory: absolutePath(temporary),
+          legacy: false,
+        });
+        const ready = path.join(destination.outbox, name.slice(0, -".tar.zst".length));
+        if (yield* fs.exists(ready)) {
+          return yield* new BackupError({
+            message: `Archive already exists: ${ready}`,
+          });
+        }
+        yield* fs.rename(temporary, ready);
+      }),
+    (directory) => fs.remove(directory, { recursive: true, force: true }),
   );
-  const file = absolutePath(path.join(temporary, name));
-  // GNU tar streams to zstd; the outbox never needs an uncompressed tar copy.
-  yield* commands.run("tar", [
-    "--use-compress-program=zstd",
-    "--create",
-    "--file",
-    file,
-    "--directory",
-    path.dirname(stage),
-    path.basename(stage),
-  ]);
-  yield* fs.chmod(file, 0o600);
-  const output = yield* commands.run("sha256sum", [name], { cwd: temporary });
-  yield* fs.writeFileString(`${file}.sha256`, `${output}\n`, { mode: 0o600 });
-  yield* verify({
-    name,
-    file,
-    checksum: absolutePath(`${file}.sha256`),
-    directory: absolutePath(temporary),
-    legacy: false,
-  });
-  const ready = path.join(destination.outbox, name.slice(0, -".tar.zst".length));
-  if (yield* fs.exists(ready)) {
-    return yield* new BackupError({
-      message: `Archive already exists: ${ready}`,
-    });
-  }
-  yield* fs.rename(temporary, ready);
 }, Effect.scoped);
 
 const acknowledge = Effect.fn("Outbox.acknowledge")(function* (archive: Archive) {
-  const { fs } = yield* Storage;
+  const { fs, path } = yield* Storage;
   if (archive.legacy) {
-    yield* fs.remove(archive.file);
-    yield* fs.remove(archive.checksum);
+    const marker = path.join(archive.directory, `.ack-${archive.name}`);
+    yield* fs.makeDirectory(marker, { recursive: true, mode: 0o700 });
+    yield* fs.remove(archive.file, { force: true });
+    yield* fs.remove(archive.checksum, { force: true });
+    yield* fs.remove(marker, { recursive: true, force: true });
   } else {
-    yield* fs.remove(archive.directory, { recursive: true });
+    const retired = path.join(
+      path.dirname(archive.directory),
+      `.retired-${path.basename(archive.directory)}`,
+    );
+    yield* fs.rename(archive.directory, retired);
+    yield* fs.remove(retired, { recursive: true, force: true });
   }
 });
 
@@ -126,15 +160,24 @@ const drain = Effect.fn("Outbox.drain")(function* (
   yield* Effect.addFinalizer(() => Queue.shutdown(queue));
   yield* Queue.offerAll(queue, yield* list(job, destination));
   yield* Queue.end(queue);
+  const failures: string[] = [];
   yield* Stream.fromQueue(queue).pipe(
     Stream.runForEach(
       Effect.fn("Outbox.deliver")(function* (archive) {
-        yield* verify(archive);
-        yield* upload(archive);
-        yield* acknowledge(archive);
+        const result = yield* Effect.gen(function* () {
+          yield* verify(archive);
+          yield* upload(archive);
+          yield* acknowledge(archive);
+        }).pipe(Effect.result);
+        if (Result.isFailure(result)) {
+          failures.push(`${archive.name}: ${String(result.failure)}`);
+        }
       }),
     ),
   );
+  if (failures.length > 0) {
+    return yield* new BackupError({ message: failures.join("; ") });
+  }
 }, Effect.scoped);
 
 export class Outbox extends Context.Service<
