@@ -1,13 +1,13 @@
 import { Effect } from "effect";
 import { Commands } from "./commands.ts";
 import { BackupError } from "./model.ts";
-import { protonEnvironment } from "./proton.ts";
+import { protonEnvironment, protonPaths } from "./proton-state.ts";
 import { privateDirectory, Storage } from "./storage.ts";
 
 export const login = Effect.fn("Proton.login")(function* () {
   const commands = yield* Commands;
   const { fs } = yield* Storage;
-  for (const directory of ["/proton/gnupg", "/proton/pass", "/proton/cache"]) {
+  for (const directory of Object.values(protonPaths)) {
     yield* privateDirectory(directory);
   }
   const options = { env: protonEnvironment };
@@ -72,7 +72,7 @@ export const login = Effect.fn("Proton.login")(function* () {
       options,
     );
   }
-  if (!(yield* fs.exists("/proton/pass/.gpg-id"))) {
+  if (!(yield* fs.exists(`${protonPaths.passwordStore}/.gpg-id`))) {
     yield* commands.run("pass", ["init", fingerprint], options);
   }
   yield* commands.run("proton-drive", ["auth", "login"], {

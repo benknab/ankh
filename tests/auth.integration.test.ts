@@ -2,7 +2,7 @@ import { it } from "@effect/vitest";
 import { Effect } from "effect";
 import { login } from "../src/auth.ts";
 import { Commands } from "../src/commands.ts";
-import { protonEnvironment } from "../src/proton.ts";
+import { protonEnvironment } from "../src/proton-state.ts";
 import { Storage } from "../src/storage.ts";
 import { infrastructure } from "./integration-support.ts";
 import { assert } from "./support.ts";

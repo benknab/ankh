@@ -3,7 +3,7 @@ import { DateTime, Effect, HashSet, Ref, Result, Schema } from "effect";
 import { BackupError, Job, Proton } from "../src/model.ts";
 import { ProtonDrive } from "../src/proton.ts";
 import { retainProton } from "../src/proton-retention.ts";
-import { archiveName } from "../src/retention.ts";
+import { archiveName } from "../src/archive.ts";
 import { Storage } from "../src/storage.ts";
 import { infrastructure } from "./integration-support.ts";
 import { assert, fixture } from "./support.ts";

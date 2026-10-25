@@ -1,8 +1,8 @@
 import { NodeRuntime } from "@effect/platform-node";
-import { Effect } from "effect";
+import { Console, Effect } from "effect";
 import { Argument, Command } from "effect/cli";
 import { Live } from "./src/layers.ts";
-import { AbsolutePath, Actions } from "./src/model.ts";
+import { AbsolutePath, Actions, BackupError } from "./src/model.ts";
 import { runJob } from "./src/runner.ts";
 import { login } from "./src/auth.ts";
 import { serve } from "./src/scheduler.ts";
@@ -54,8 +54,11 @@ const cli = Command.make("backup-runner").pipe(
   ]),
   Command.run({ version: metadata.version }),
   Effect.provide(Live),
+  Effect.tapError((error) =>
+    error instanceof BackupError ? Console.error(error.message) : Console.error(String(error)),
+  ),
 );
 
 if (import.meta.main) {
-  NodeRuntime.runMain(cli);
+  NodeRuntime.runMain(cli, { disableErrorReporting: true });
 }

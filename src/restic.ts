@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect";
-import { Commands } from "./commands.ts";
+import { Commands, type Options } from "./commands.ts";
 import { type DestinationRequest, type Job, type Restic } from "./model.ts";
 import { Storage } from "./storage.ts";
 
@@ -17,7 +17,8 @@ export const runRestic = Effect.fn("Restic.run")(function* (
   yield* Schema.decodeEffect(Schema.NonEmptyString)(
     (yield* fs.readFileString(destination.passwordFile)).trim(),
   );
-  const options = {
+  const options: Options = {
+    output: "tail",
     env: {
       RESTIC_CACHE_DIR: "/tmp/restic-cache",
       RESTIC_REPOSITORY: destination.repository,

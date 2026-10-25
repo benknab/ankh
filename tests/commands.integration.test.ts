@@ -16,3 +16,36 @@ it.live("Commands drains stdout and stderr and rejects nonzero exits", () =>
     }
   }).pipe(Effect.provide(infrastructure)),
 );
+
+it.live("command diagnostics are bounded and redact supplied secrets", () =>
+  Effect.gen(function* () {
+    const commands = yield* Commands;
+    const tail = yield* commands.run(
+      process.execPath,
+      ["--eval", 'process.stdout.write("x".repeat(1024 * 1024) + "end")'],
+      { output: "tail" },
+    );
+    yield* assert(
+      tail.length <= 64 * 1024 && tail.endsWith("end"),
+      "ordinary output must retain only a bounded tail",
+    );
+    const failed = yield* commands
+      .run(
+        process.execPath,
+        ["--eval", "process.stderr.write(process.env.PGPASSWORD); process.exitCode = 7"],
+        { env: { PGPASSWORD: "synthetic-secret" } },
+      )
+      .pipe(Effect.result);
+    yield* assert(Result.isFailure(failed), "command must fail");
+    if (Result.isFailure(failed)) {
+      yield* assert(
+        failed.failure.exitCode === 7 && failed.failure.operation === process.execPath,
+        "structured failure details must survive",
+      );
+      yield* assert(
+        !failed.failure.message.includes("synthetic-secret"),
+        "diagnostics must redact secrets",
+      );
+    }
+  }).pipe(Effect.provide(infrastructure)),
+);

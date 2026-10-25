@@ -1,12 +1,17 @@
 import { Context, Effect, Layer, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
-import { BackupError } from "./model.ts";
+import { BackupError, backupError } from "./model.ts";
 
 export type Options = {
   readonly cwd?: string;
   readonly env?: Record<string, string>;
   readonly interactive?: boolean;
+  readonly output?: "capture" | "tail";
+  readonly redact?: readonly string[];
 };
+
+const captureLimit = 16 * 1024 * 1024;
+const diagnosticLimit = 64 * 1024;
 
 export class Commands extends Context.Service<
   Commands,
@@ -35,21 +40,53 @@ export class Commands extends Context.Service<
           );
           const [stdout, stderr, code] = yield* Effect.all(
             [
-              Stream.mkString(Stream.decodeText(child.stdout)),
-              Stream.mkString(Stream.decodeText(child.stderr)),
+              Stream.runFold(
+                Stream.decodeText(child.stdout),
+                () => ({ text: "", overflow: false }),
+                (state, chunk) => {
+                  const text = state.text + chunk;
+                  return options.output === "tail"
+                    ? { text: text.slice(-diagnosticLimit), overflow: false }
+                    : {
+                        text: text.slice(0, captureLimit),
+                        overflow: state.overflow || text.length > captureLimit,
+                      };
+                },
+              ),
+              Stream.runFold(
+                Stream.decodeText(child.stderr),
+                () => "",
+                (text, chunk) => (text + chunk).slice(-diagnosticLimit),
+              ),
               child.exitCode,
             ],
             { concurrency: "unbounded" },
           );
+          const secrets = [
+            ...(options.redact ?? []),
+            ...Object.entries(options.env ?? {})
+              .filter(([key]) => /PASSWORD|TOKEN|SECRET/.test(key) && !key.endsWith("_FILE"))
+              .map(([, value]) => value),
+          ].filter((value) => value.length > 0);
+          const redact = (text: string) =>
+            secrets.reduce((value, secret) => value.replaceAll(secret, "[redacted]"), text);
           if (code !== 0) {
             return yield* new BackupError({
-              message: `${binary} exited ${code}: ${stderr.trim()}`,
+              message: `${binary} exited ${code}: ${redact(stderr.trim())}`,
+              operation: binary,
+              exitCode: code,
             });
           }
-          return stdout.trim();
+          if (stdout.overflow) {
+            return yield* new BackupError({
+              message: `${binary} output exceeded the capture limit`,
+              operation: binary,
+            });
+          }
+          return redact(stdout.text.trim());
         },
         Effect.scoped,
-        Effect.mapError((e) => new BackupError({ message: String(e) })),
+        Effect.mapError(backupError("Command")),
       );
       return Commands.of({ run });
     }),

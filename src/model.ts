@@ -5,7 +5,17 @@ export class BackupError extends Schema.TaggedError<
   { readonly brand: unique symbol }
 >()("BackupError", {
   message: Schema.String,
+  operation: Schema.optionalKey(Schema.String),
+  exitCode: Schema.optionalKey(Schema.Int),
+  cause: Schema.optionalKey(Schema.Defect()),
 }) {}
+
+export const backupError =
+  (operation: string) =>
+  (cause: unknown): BackupError =>
+    cause instanceof BackupError
+      ? cause
+      : new BackupError({ message: `${operation} failed`, operation, cause });
 
 export const JobName = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]*$/)).pipe(
   Schema.brand("JobName"),

@@ -2,7 +2,8 @@ import { it } from "@effect/vitest";
 import { DateTime, Effect, HashSet, Layer, Ref, Result, Schema } from "effect";
 import { Destinations } from "../src/destinations.ts";
 import { absolutePath, BackupError, Job, JobName } from "../src/model.ts";
-import { archiveName, expiredSnapshots, snapshotNames } from "../src/retention.ts";
+import { archiveName } from "../src/archive.ts";
+import { expiredSnapshots, parseSnapshotPairs } from "../src/retention.ts";
 import { execute } from "../src/runner.ts";
 import { Sources } from "../src/sources.ts";
 
@@ -29,44 +30,51 @@ it.effect("schemas reject unsafe paths, names, duplicate destinations, and empty
   }),
 );
 
-for (const failed of ["restic", "proton-drive"] as const) {
-  it.effect(`runner stages once and attempts both destinations when ${failed} fails`, () =>
-    Effect.gen(function* () {
-      const job = yield* Schema.decodeUnknownEffect(Job)(fixture);
-      const stages = yield* Ref.make(0);
-      const attempts = yield* Ref.make(HashSet.empty<string>());
-      const source = Layer.succeed(
-        Sources,
-        Sources.of({
-          stage: () =>
-            Ref.update(stages, (n) => n + 1).pipe(Effect.as(absolutePath("/staging/test-job"))),
-        }),
-      );
-      const destinations = Layer.succeed(
-        Destinations,
-        Destinations.of({
-          run: (_job, destination, request) =>
-            Effect.gen(function* () {
-              yield* assert(
-                request.action === "backup" && request.stage === "/staging/test-job",
-                "same stage must reach each destination",
-              );
-              yield* Ref.update(attempts, (set) => HashSet.add(set, destination.type));
-              if (destination.type === failed) {
-                return yield* new BackupError({ message: "offline" });
-              }
+for (const reverse of [false, true]) {
+  for (const failed of ["restic", "proton-drive"] as const) {
+    it.effect(
+      `runner stages once and attempts both destinations when ${failed} fails (reversed: ${reverse})`,
+      () =>
+        Effect.gen(function* () {
+          const job = yield* Schema.decodeUnknownEffect(Job)({
+            ...fixture,
+            destinations: reverse ? [...fixture.destinations].reverse() : fixture.destinations,
+          });
+          const stages = yield* Ref.make(0);
+          const attempts = yield* Ref.make(HashSet.empty<string>());
+          const source = Layer.succeed(
+            Sources,
+            Sources.of({
+              stage: () =>
+                Ref.update(stages, (n) => n + 1).pipe(Effect.as(absolutePath("/staging/test-job"))),
             }),
+          );
+          const destinations = Layer.succeed(
+            Destinations,
+            Destinations.of({
+              run: (_job, destination, request) =>
+                Effect.gen(function* () {
+                  yield* assert(
+                    request.action === "backup" && request.stage === "/staging/test-job",
+                    "same stage must reach each destination",
+                  );
+                  yield* Ref.update(attempts, (set) => HashSet.add(set, destination.type));
+                  if (destination.type === failed) {
+                    return yield* new BackupError({ message: "offline" });
+                  }
+                }),
+            }),
+          );
+          const result = yield* execute(job, "backup").pipe(
+            Effect.provide(Layer.merge(source, destinations)),
+            Effect.result,
+          );
+          yield* assert(Result.isFailure(result), "partial failure must fail the job");
+          yield* assert((yield* Ref.get(stages)) === 1, "source must stage once");
+          yield* assert(HashSet.size(yield* Ref.get(attempts)) === 2, "both destinations must run");
         }),
-      );
-      const result = yield* execute(job, "backup").pipe(
-        Effect.provide(Layer.merge(source, destinations)),
-        Effect.result,
-      );
-      yield* assert(Result.isFailure(result), "partial failure must fail the job");
-      yield* assert((yield* Ref.get(stages)) === 1, "source must stage once");
-      yield* assert(HashSet.size(yield* Ref.get(attempts)) === 2, "both destinations must run");
-    }),
-  );
+    );
+  }
 }
 
 it.effect("retention consumes parsed snapshots and keeps newest per UTC period", () =>
@@ -80,7 +88,7 @@ it.effect("retention consumes parsed snapshots and keeps newest per UTC period",
     ];
     const names = timestamps.map((time) => archiveName(job, DateTime.makeUnsafe(time)));
     const files = HashSet.fromIterable(names.flatMap((name) => [name, `${name}.sha256`]));
-    const snapshots = yield* snapshotNames(job, files);
+    const snapshots = yield* parseSnapshotPairs(job, files);
     const expired = expiredSnapshots(snapshots, {
       daily: 1,
       weekly: 2,
@@ -92,7 +100,7 @@ it.effect("retention consumes parsed snapshots and keeps newest per UTC period",
       !HashSet.has(expired, archiveName(job, DateTime.makeUnsafe(timestamps[0]!))),
       "newest must survive",
     );
-    const missing = yield* snapshotNames(job, HashSet.fromIterable(names)).pipe(Effect.result);
+    const missing = yield* parseSnapshotPairs(job, HashSet.fromIterable(names)).pipe(Effect.result);
     yield* assert(Result.isFailure(missing), "retention must reject incomplete pairs");
   }),
 );

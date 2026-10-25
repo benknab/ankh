@@ -1,36 +1,19 @@
-import { DateTime, Effect, HashSet, Option, Schema } from "effect";
+import { DateTime, Effect, HashSet, Option } from "effect";
+import { archiveTime } from "./archive.ts";
 import {
   archiveFileName,
-  ArchiveName,
+  type ArchiveName,
   BackupError,
   type JobName,
   type Retention,
 } from "./model.ts";
-
-export const archiveName = (job: JobName, time: DateTime.Utc): ArchiveName =>
-  archiveFileName(`${job}-${DateTime.formatIso(time).replace(/[-:.]/g, "")}.tar.zst`);
-
-export const archiveTime = (job: JobName, name: string): Option.Option<DateTime.Utc> => {
-  if (Option.isNone(Schema.decodeOption(ArchiveName)(name))) {
-    return Option.none();
-  }
-  const match = name.match(
-    new RegExp(`^${job}-(\\d{4})(\\d{2})(\\d{2})T(\\d{2})(\\d{2})(\\d{2})(\\d{3})Z\\.tar\\.zst$`),
-  );
-  if (!match) {
-    return Option.none();
-  }
-  return DateTime.make(
-    `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}.${match[7]}Z`,
-  ).pipe(Option.filter((time) => archiveName(job, time) === name));
-};
 
 export type Snapshot = {
   readonly name: ArchiveName;
   readonly time: DateTime.Utc;
 };
 
-export const snapshotNames = Effect.fn("snapshotNames")(function* (
+export const parseSnapshotPairs = Effect.fn("parseSnapshotPairs")(function* (
   job: JobName,
   names: HashSet.HashSet<string>,
 ) {
@@ -65,16 +48,20 @@ export const expiredSnapshots = (
     (a, b) => DateTime.toEpochMillis(b.time) - DateTime.toEpochMillis(a.time),
   );
   let keep = HashSet.empty<ArchiveName>();
-  const periods = ["day", "week", "month", "year"] as const;
-  const counts = [retention.daily, retention.weekly, retention.monthly, retention.yearly];
-  for (const [index, period] of periods.entries()) {
+  const periods = [
+    ["day", retention.daily],
+    ["week", retention.weekly],
+    ["month", retention.monthly],
+    ["year", retention.yearly],
+  ] as const;
+  for (const [period, count] of periods) {
     let seen = HashSet.empty<string>();
     for (const snapshot of snapshots) {
       const key = DateTime.formatIso(DateTime.startOf(snapshot.time, period, { weekStartsOn: 1 }));
       if (HashSet.has(seen, key)) {
         continue;
       }
-      if (HashSet.size(seen) >= (counts[index] ?? 0)) {
+      if (HashSet.size(seen) >= count) {
         break;
       }
       seen = HashSet.add(seen, key);
@@ -83,15 +70,3 @@ export const expiredSnapshots = (
   }
   return HashSet.difference(HashSet.fromIterable(snapshots.map((s) => s.name)), keep);
 };
-
-export const RemoteNodes = Schema.fromJsonString(
-  Schema.Array(
-    Schema.Struct({
-      name: Schema.Struct({
-        ok: Schema.Literal(true),
-        value: Schema.NonEmptyString,
-      }),
-      type: Schema.Literal("file"),
-    }),
-  ),
-);

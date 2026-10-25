@@ -3,7 +3,7 @@ import { DateTime, Effect, HashSet, Layer, Ref, Result, Schema } from "effect";
 import { Commands } from "../src/commands.ts";
 import { absolutePath, BackupError, JobName, Proton } from "../src/model.ts";
 import { ProtonDrive } from "../src/proton.ts";
-import { archiveName } from "../src/retention.ts";
+import { archiveName } from "../src/archive.ts";
 import { assert } from "./support.ts";
 
 const destination = Schema.decodeSync(Proton)({

@@ -1,23 +1,23 @@
 import { Context, Effect, HashSet, Layer, Schema } from "effect";
 import { Commands } from "./commands.ts";
-import { type ArchiveName, BackupError, type Proton } from "./model.ts";
-import { type Archive } from "./outbox.ts";
-import { RemoteNodes } from "./retention.ts";
+import { type ArchiveName, BackupError, backupError, type Proton } from "./model.ts";
+import { type Archive } from "./archive.ts";
 
-export const protonEnvironment = {
-  GNUPGHOME: "/proton/gnupg",
-  HOME: "/tmp",
-  PASSWORD_STORE_DIR: "/proton/pass",
-  PROTON_DRIVE_CACHE_DIR: "/proton/cache",
-  PROTON_DRIVE_CREDENTIALS_STORE: "pass",
-  PROTON_DRIVE_LOG_LEVEL: "WARNING",
-};
+import { protonEnvironment } from "./proton-state.ts";
 
 const Folders = Schema.fromJsonString(
   Schema.Array(
     Schema.Struct({
       name: Schema.Struct({ ok: Schema.Literal(true), value: Schema.NonEmptyString }),
       type: Schema.Literal("folder"),
+    }),
+  ),
+);
+const RemoteNodes = Schema.fromJsonString(
+  Schema.Array(
+    Schema.Struct({
+      name: Schema.Struct({ ok: Schema.Literal(true), value: Schema.NonEmptyString }),
+      type: Schema.Literal("file"),
     }),
   ),
 );
@@ -49,7 +49,7 @@ export class ProtonDrive extends Context.Service<
           );
           return HashSet.fromIterable(nodes.map((node) => node.name.value));
         },
-        Effect.mapError((e) => new BackupError({ message: String(e) })),
+        Effect.mapError(backupError("Proton listing")),
       );
       const initialize = Effect.fn("ProtonDrive.initialize")(function* (destination: Proton) {
         let parent = "/my-files";

@@ -1,7 +1,8 @@
 import { Effect, HashSet, Option, Schema } from "effect";
 import { ArchiveName, BackupError, type Job, type Proton, RemoteFolder } from "./model.ts";
 import { ProtonDrive } from "./proton.ts";
-import { archiveTime, expiredSnapshots, snapshotNames } from "./retention.ts";
+import { archiveTime } from "./archive.ts";
+import { expiredSnapshots, parseSnapshotPairs } from "./retention.ts";
 import { privateDirectory, Storage } from "./storage.ts";
 
 const Intent = Schema.fromJsonString(
@@ -32,7 +33,7 @@ export const retainProton = Effect.fn("Proton.retain")(function* (job: Job, dest
     yield* proton.trash(destination, HashSet.fromIterable(pending.names));
     yield* fs.remove(journal);
   }
-  const snapshots = yield* snapshotNames(job.name, yield* proton.list(destination));
+  const snapshots = yield* parseSnapshotPairs(job.name, yield* proton.list(destination));
   const expired = expiredSnapshots(snapshots, job.retention);
   if (HashSet.size(expired) === 0) {
     return;

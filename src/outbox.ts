@@ -15,21 +15,13 @@ import {
   type AbsolutePath,
   absolutePath,
   archiveFileName,
-  type ArchiveName,
   BackupError,
+  backupError,
   type Job,
   type Proton,
 } from "./model.ts";
-import { archiveName, archiveTime } from "./retention.ts";
+import { type Archive, archiveName, archiveTime } from "./archive.ts";
 import { privateDirectory, Storage } from "./storage.ts";
-
-export type Archive = {
-  readonly name: ArchiveName;
-  readonly file: AbsolutePath;
-  readonly checksum: AbsolutePath;
-  readonly directory: AbsolutePath;
-  readonly legacy: boolean;
-};
 
 const verify = Effect.fn("Outbox.verify")(function* (archive: Archive) {
   const { fs } = yield* Storage;
@@ -201,10 +193,7 @@ export class Outbox extends Context.Service<
     Effect.gen(function* () {
       const context = yield* Effect.context<Commands | Storage>();
       const provide = <A, E>(effect: Effect.Effect<A, E, Commands | Storage>) =>
-        effect.pipe(
-          Effect.provide(context),
-          Effect.mapError((e) => new BackupError({ message: String(e) })),
-        );
+        effect.pipe(Effect.provide(context), Effect.mapError(backupError("Outbox")));
       return Outbox.of({
         enqueue: (job, destination, stage) => provide(enqueue(job, destination, stage)),
         drain: (job, destination, upload) => provide(drain(job, destination, upload)),

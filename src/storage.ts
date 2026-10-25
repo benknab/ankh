@@ -1,5 +1,5 @@
-import { Context, Effect, FileSystem, Layer, Path, Schedule, Schema } from "effect";
-import { type AbsolutePath, BackupError, type Job, JobJson } from "./model.ts";
+import { Context, Effect, FileSystem, Layer, Path, Ref, Schedule, Schema } from "effect";
+import { type AbsolutePath, BackupError, backupError, type Job, JobJson } from "./model.ts";
 
 export class Storage extends Context.Service<
   Storage,
@@ -62,8 +62,15 @@ export const privateDirectory = Effect.fn("privateDirectory")(function* (directo
 export const withLock = Effect.fn("withLock")(function* (job: Job) {
   const { fs, path } = yield* Storage;
   const directory = path.join(path.dirname(job.backupDrive.sentinelFile), ".runner-lock");
+  const released = yield* Ref.make(false);
+  const release = Effect.gen(function* () {
+    if (!(yield* Ref.get(released))) {
+      yield* fs.remove(directory, { recursive: true });
+      yield* Ref.set(released, true);
+    }
+  }).pipe(Effect.uninterruptible, Effect.mapError(backupError("Drive lock cleanup")));
   yield* Effect.acquireRelease(fs.makeDirectory(directory, { mode: 0o700 }), () =>
-    fs.remove(directory, { recursive: true }).pipe(Effect.orDie),
+    release.pipe(Effect.catch((error) => Effect.logError(error.message))),
   ).pipe(
     Effect.retry({
       schedule: Schedule.spaced("10 seconds"),
@@ -77,4 +84,5 @@ export const withLock = Effect.fn("withLock")(function* (job: Job) {
         }),
     ),
   );
+  return { release };
 });
