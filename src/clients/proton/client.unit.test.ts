@@ -58,14 +58,14 @@ it.effect("Proton rejects malformed listings and unconfirmed uploads", () =>
   Effect.gen(function* () {
     const destination = yield* destinationConfig;
     const name = yield* archive;
+    const directory = absolutePath(`/outbox/${name.slice(0, -".tar.zst".length)}`);
     const commands = Commands.of({ run: () => Effect.succeed(output("[]")) });
     const result = yield* Effect.gen(function* () {
       yield* (yield* ProtonDrive).upload(destination, {
         name,
-        file: absolutePath(`/outbox/${name}`),
-        checksum: absolutePath(`/outbox/${name}.sha256`),
-        directory: absolutePath("/outbox"),
-        legacy: true,
+        file: absolutePath(`${directory}/${name}`),
+        checksum: absolutePath(`${directory}/${name}.sha256`),
+        directory,
       });
     }).pipe(
       Effect.provide(ProtonDrive.layer.pipe(Layer.provide(Layer.succeed(Commands, commands)))),

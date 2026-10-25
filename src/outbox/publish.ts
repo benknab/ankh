@@ -42,7 +42,6 @@ export const enqueue = Effect.fn("Outbox.enqueue")(function* (
           file: absolutePath(path.join(temporary, name)),
           checksum: absolutePath(path.join(temporary, `${name}.sha256`)),
           directory: absolutePath(temporary),
-          legacy: false,
         },
         path.join(destination.outbox, name.slice(0, -".tar.zst".length)),
       ),

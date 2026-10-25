@@ -89,73 +89,58 @@ it.live("durable outbox survives failure, retries through Queue, and restores SQ
   }).pipe(Effect.provide(outboxInfrastructure)),
 );
 
-for (const interruption of ["directory", "archive", "checksum"] as const) {
-  const legacy = interruption !== "directory";
-  it.live(
-    `outbox resumes acknowledgement interrupted at ${interruption} removal without uploading again`,
-    () =>
-      Effect.gen(function* () {
-        const storage = yield* Storage;
-        const { fs, path } = storage;
-        const commands = yield* Commands;
-        const root = yield* fs.makeTempDirectoryScoped();
-        const stage = absolutePath(path.join(root, "test-job"));
-        yield* fs.makeDirectory(stage);
-        yield* fs.writeFileString(path.join(stage, "data"), "verified");
-        const destination = yield* Schema.decodeEffect(Proton)({
-          type: "proton-drive",
-          outbox: path.join(root, "outbox"),
-          remoteFolder: "/my-files/a",
-        });
-        const job = yield* Schema.decodeUnknownEffect(Job)(fixture);
-        const outbox = yield* Outbox;
-        yield* outbox.enqueue(job, destination, stage);
-        if (legacy) {
-          const entry = Option.getOrThrow(Array.head(yield* fs.readDirectory(destination.outbox)));
-          const ready = path.join(destination.outbox, entry);
-          for (const file of yield* fs.readDirectory(ready)) {
-            yield* fs.rename(path.join(ready, file), path.join(destination.outbox, file));
-          }
-          yield* fs.remove(ready, { recursive: true });
-        }
-        const uploads = yield* Ref.make(0);
-        const interruptedStorage = Storage.of({
-          ...storage,
-          fs: {
-            ...fs,
-            remove: (file, options) =>
-              (
-                legacy
-                  ? file.endsWith(interruption === "archive" ? ".tar.zst" : ".sha256")
-                  : path.basename(file).startsWith(".retired-")
-              )
-                ? Effect.interrupt
-                : fs.remove(file, options),
-          },
-        });
-        const interrupted = Layer.fresh(Outbox.layer).pipe(
-          Layer.provide(
-            Layer.mergeAll(
-              Layer.succeed(Storage, interruptedStorage),
-              Layer.succeed(Commands, commands),
-            ),
+it.live(
+  "outbox resumes acknowledgement interrupted at directory removal without uploading again",
+  () =>
+    Effect.gen(function* () {
+      const storage = yield* Storage;
+      const { fs, path } = storage;
+      const commands = yield* Commands;
+      const root = yield* fs.makeTempDirectoryScoped();
+      const stage = absolutePath(path.join(root, "test-job"));
+      yield* fs.makeDirectory(stage);
+      yield* fs.writeFileString(path.join(stage, "data"), "verified");
+      const destination = yield* Schema.decodeEffect(Proton)({
+        type: "proton-drive",
+        outbox: path.join(root, "outbox"),
+        remoteFolder: "/my-files/a",
+      });
+      const job = yield* Schema.decodeUnknownEffect(Job)(fixture);
+      const outbox = yield* Outbox;
+      yield* outbox.enqueue(job, destination, stage);
+      const uploads = yield* Ref.make(0);
+      const interruptedStorage = Storage.of({
+        ...storage,
+        fs: {
+          ...fs,
+          remove: (file, options) =>
+            path.basename(file).startsWith(".retired-")
+              ? Effect.interrupt
+              : fs.remove(file, options),
+        },
+      });
+      const interrupted = Layer.fresh(Outbox.layer).pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.succeed(Storage, interruptedStorage),
+            Layer.succeed(Commands, commands),
           ),
-        );
-        const exit = yield* Effect.gen(function* () {
-          const pending = yield* Outbox;
-          yield* pending.drain(job, destination, () => Ref.update(uploads, (n) => n + 1));
-        }).pipe(Effect.provide(interrupted), Effect.exit);
-        expect(Exit.isFailure(exit), "injected interruption must occur").toBe(true);
-        expect(yield* Ref.get(uploads), "upload must have completed before interruption").toBe(1);
-        yield* outbox.drain(job, destination, () => Ref.update(uploads, (n) => n + 1));
-        expect(yield* Ref.get(uploads), "retired archives must not upload twice").toBe(1);
-        expect(
-          yield* fs.readDirectory(destination.outbox),
-          "retry must complete local retirement",
-        ).toHaveLength(0);
-      }).pipe(Effect.provide(outboxInfrastructure)),
-  );
-}
+        ),
+      );
+      const exit = yield* Effect.gen(function* () {
+        const pending = yield* Outbox;
+        yield* pending.drain(job, destination, () => Ref.update(uploads, (n) => n + 1));
+      }).pipe(Effect.provide(interrupted), Effect.exit);
+      expect(Exit.isFailure(exit), "injected interruption must occur").toBe(true);
+      expect(yield* Ref.get(uploads), "upload must have completed before interruption").toBe(1);
+      yield* outbox.drain(job, destination, () => Ref.update(uploads, (n) => n + 1));
+      expect(yield* Ref.get(uploads), "retired archives must not upload twice").toBe(1);
+      expect(
+        yield* fs.readDirectory(destination.outbox),
+        "retry must complete local retirement",
+      ).toHaveLength(0);
+    }).pipe(Effect.provide(outboxInfrastructure)),
+);
 
 it.live("a corrupt ready archive stays on disk while later valid archives upload", () =>
   Effect.gen(function* () {
@@ -192,30 +177,36 @@ it.live("a corrupt ready archive stays on disk while later valid archives upload
 );
 
 for (const member of ["archive", "checksum"] as const) {
-  it.live(`an orphan legacy ${member} fails verification and stays available for recovery`, () =>
-    Effect.gen(function* () {
-      const { fs, path } = yield* Storage;
-      const outbox = yield* Outbox;
-      const root = yield* fs.makeTempDirectoryScoped();
-      const destination = yield* Schema.decodeEffect(Proton)({
-        type: "proton-drive",
-        outbox: root,
-        remoteFolder: "/my-files/a",
-      });
-      const job = yield* Schema.decodeUnknownEffect(Job)(fixture);
-      const name = "test-job-20261025T033000000Z.tar.zst";
-      yield* fs.writeFileString(
-        path.join(root, member === "archive" ? name : `${name}.sha256`),
-        member === "archive" ? "incomplete" : `${"a".repeat(64)}  ${name}\n`,
-      );
-      const checked = yield* outbox.check(job, destination).pipe(Effect.result);
-      expect(Result.isFailure(checked)).toBe(true);
-      const drained = yield* outbox
-        .drain(job, destination, () => Effect.die("must not upload incomplete pair"))
-        .pipe(Effect.result);
-      expect(Result.isFailure(drained)).toBe(true);
-      expect(yield* fs.readDirectory(root)).toHaveLength(1);
-    }).pipe(Effect.provide(outboxInfrastructure)),
+  it.live(
+    `a ready pair missing its ${member} fails verification and stays available for recovery`,
+    () =>
+      Effect.gen(function* () {
+        const { fs, path } = yield* Storage;
+        const outbox = yield* Outbox;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const destination = yield* Schema.decodeEffect(Proton)({
+          type: "proton-drive",
+          outbox: root,
+          remoteFolder: "/my-files/a",
+        });
+        const job = yield* Schema.decodeUnknownEffect(Job)(fixture);
+        const entry = "test-job-20261025T033000000Z";
+        const name = `${entry}.tar.zst`;
+        const directory = path.join(root, entry);
+        yield* fs.makeDirectory(directory);
+        yield* fs.writeFileString(
+          path.join(directory, member === "archive" ? `${name}.sha256` : name),
+          member === "archive" ? `${"a".repeat(64)}  ${name}\n` : "incomplete",
+        );
+        const checked = yield* outbox.check(job, destination).pipe(Effect.result);
+        expect(Result.isFailure(checked)).toBe(true);
+        const drained = yield* outbox
+          .drain(job, destination, () => Effect.die("must not upload incomplete pair"))
+          .pipe(Effect.result);
+        expect(Result.isFailure(drained)).toBe(true);
+        expect(yield* fs.readDirectory(root)).toHaveLength(1);
+        expect(yield* fs.readDirectory(directory)).toHaveLength(1);
+      }).pipe(Effect.provide(outboxInfrastructure)),
   );
 }
 

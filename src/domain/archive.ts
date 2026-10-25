@@ -6,7 +6,6 @@ export type Archive = {
   readonly file: AbsolutePath;
   readonly checksum: AbsolutePath;
   readonly directory: AbsolutePath;
-  readonly legacy: boolean;
 };
 
 export const archiveName = (job: JobName, time: DateTime.Utc): ArchiveName =>
