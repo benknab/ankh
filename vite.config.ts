@@ -9,14 +9,14 @@ export default defineConfig({
     projects: [
       {
         extends: true,
-        test: { name: "unit", include: ["tests/**/*.unit.test.ts"] },
+        test: { name: "unit", include: ["src/**/*.unit.test.ts"] },
       },
       {
         extends: true,
         test: {
           name: "integration",
           fsModuleCache: false,
-          include: ["tests/**/*.integration.test.ts"],
+          include: ["src/**/*.integration.test.ts"],
           fileParallelism: false,
           testTimeout: 120_000,
         },

@@ -1,11 +1,11 @@
 # Job configuration
 
-`src/model.ts` defines the runtime schema. The version-1 JSON examples in
+`src/domain/model.ts` defines the runtime schema. The version-1 JSON examples in
 `examples/` are validated with the same decoder as the CLI. Unknown keys are
 errors, including nested keys.
 
 ```sh
-node main.ts validate /absolute/path/to/job.json
+node src/main.ts validate /absolute/path/to/job.json
 ```
 
 Validation reads only that file. It needs no source, backup drive, credentials,

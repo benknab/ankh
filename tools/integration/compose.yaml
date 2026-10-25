@@ -1,0 +1,46 @@
+services:
+  toolchain:
+    build:
+      context: ../..
+      target: base
+      platforms: [linux/amd64]
+    platform: linux/amd64
+
+  postgres-test:
+    image: postgres:15.19-bookworm@sha256:22c6356b2897cb0b4be6ad550b44ff97a0f29df7dbe327c01bc3c84bd457694d
+    platform: linux/amd64
+    environment:
+      POSTGRES_PASSWORD: integration-test-only
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "--host=127.0.0.1", "--username=postgres", "--dbname=postgres"]
+      interval: 1s
+      timeout: 5s
+      retries: 30
+
+  integration:
+    build:
+      context: ../..
+      dockerfile: tools/integration/Dockerfile
+      platforms: [linux/amd64]
+      additional_contexts:
+        backup-runner-toolchain: service:toolchain
+    platform: linux/amd64
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    environment:
+      # Vitest stores its API token here even for non-interactive test runs.
+      XDG_DATA_HOME: /tmp/xdg-data
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - DAC_OVERRIDE
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+      - /staging:size=64m,mode=0700
+      - /proton:size=32m,mode=0700

@@ -60,18 +60,18 @@ files being changed; the generated lockfile is excluded.
 
 ## Tests
 
-- Put isolated tests in `tests/**/*.unit.test.ts`. `pnpm test` and `pnpm test:unit`
+- Put isolated tests in `src/**/*.unit.test.ts`. `pnpm test` and `pnpm test:unit`
   run only the unit project; additional file filters are accepted.
 - Put tests using real processes, filesystems, databases, or external tools in
-  `tests/**/*.integration.test.ts`. Do not gate tests with environment variables.
+  `src/**/*.integration.test.ts`. Do not gate tests with environment variables.
 - `pnpm test:integration` requires a running Docker daemon and Compose. It builds
-  `tests/Dockerfile` using the root Dockerfile's shared `base` toolchain, starts a
+  `tools/integration/Dockerfile` using the root Dockerfile's shared `base` toolchain, starts a
   disposable PostgreSQL service, waits for readiness, and runs every integration
   test in the Linux/amd64 container. Data and credentials live in temporary
   filesystems; each run has its own Compose
   project. Cleanup runs on success, failure, or interruption.
 - Pass file filters or Vitest options to that script to target tests, for example
-  `pnpm test:integration tests/postgres.integration.test.ts`.
+  `pnpm test:integration src/sources/postgres.integration.test.ts`.
 - `pnpm test:integration:run` is the inner runner for an already prepared
   environment. It runs tests directly and does not provision dependencies.
 - `pnpm test:all` runs both suites. Full integration tests use real local tools
@@ -84,7 +84,7 @@ scheduled services only after real backups and restores pass for every opted-in 
 ## Container checks
 
 Keep the production image in the root Dockerfile and the integration image in
-`tests/Dockerfile`. Run `bash tools/quickstart.sh` after changing container setup or
+`tools/integration/Dockerfile`. Run `bash tools/quickstart.sh` after changing container setup or
 examples; it verifies a real backup and restore using the production image.
 Keep the build-context allowlist free of credentials and deployment settings.
 CI only runs verification and tests. Do not create releases, version tags, or

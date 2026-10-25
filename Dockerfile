@@ -47,9 +47,9 @@ LABEL org.opencontainers.image.source="https://github.com/benknab/backup-runner"
 FROM base AS runner
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile --prod --ignore-scripts
-COPY main.ts ./
 COPY src ./src
+RUN find src -type f -name '*.test.ts' -delete && rm -rf src/testing
 COPY gitea-askpass.sh /app/gitea-askpass.sh
 RUN chmod 0755 /app/gitea-askpass.sh
 
-ENTRYPOINT ["node", "/app/main.ts"]
+ENTRYPOINT ["node", "/app/src/main.ts"]

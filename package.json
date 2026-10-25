@@ -14,7 +14,7 @@
   },
   "type": "module",
   "scripts": {
-    "start": "node main.ts",
+    "start": "node src/main.ts",
     "check": "pnpm fmt:check && pnpm lint && pnpm typecheck",
     "fmt": "vp fmt",
     "fmt:check": "vp fmt --check",
