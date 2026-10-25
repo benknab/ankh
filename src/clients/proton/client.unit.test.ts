@@ -100,6 +100,10 @@ it.effect("Proton commands run under the state lock with a pinned environment", 
     }).pipe(Effect.provide(protonLayer(commands)));
     const [call] = yield* Ref.get(calls);
     expect(call?.binary, "every Proton tool must run through flock").toBe("flock");
+    expect(
+      call?.options?.extendEnv,
+      "Proton must not inherit unrelated secrets or TLS overrides",
+    ).toBe(false);
     expect(call?.args.slice(0, 9)).toEqual([
       "--exclusive",
       "--close",
@@ -112,6 +116,8 @@ it.effect("Proton commands run under the state lock with a pinned environment", 
       "filesystem",
     ]);
     expect(call?.options?.env, "inherited variables must not redirect the CLI").toMatchObject({
+      PATH: "/usr/local/bin:/usr/bin:/bin",
+      LC_ALL: "C.UTF-8",
       PROTON_DRIVE_BASE_URL: "drive-api.proton.me",
       PROTON_DRIVE_CREDENTIALS_STORE: "pass",
       PROTON_DRIVE_UNSAFE_CACHE: "false",
@@ -203,7 +209,11 @@ it.effect("Proton rejects malformed listings and unconfirmed uploads", () =>
     expect(Result.isFailure(result), "missing remote pair must fail upload confirmation").toBe(
       true,
     );
-    for (const invalid of ["not json", '[{"name":{"ok":false},"type":"file"}]']) {
+    for (const invalid of [
+      "not json",
+      '[{"name":{"ok":false},"type":"file"}]',
+      '[{"name":{"ok":true,"value":"duplicate"},"type":"file"},{"name":{"ok":true,"value":"duplicate"},"type":"file"}]',
+    ]) {
       const invalidResult = yield* Effect.gen(function* () {
         return yield* (yield* ProtonDrive).list(destination);
       }).pipe(

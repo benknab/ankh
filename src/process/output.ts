@@ -11,6 +11,7 @@ export interface CommandOutput {
 export interface Options {
   readonly cwd?: string;
   readonly env?: Readonly<Record<string, Argument>>;
+  readonly extendEnv?: boolean;
   readonly interactive?: boolean;
   readonly output?: "capture" | "tail";
 }

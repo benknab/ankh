@@ -67,6 +67,8 @@ export const protonEnvironment = (
   paths: ProtonPaths,
   protection: KeyProtection,
 ): Readonly<Record<string, string>> => ({
+  PATH: "/usr/local/bin:/usr/bin:/bin",
+  LC_ALL: "C.UTF-8",
   GNUPGHOME: paths.gnupg,
   HOME: "/tmp",
   PASSWORD_STORE_DIR: paths.passwordStore,

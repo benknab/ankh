@@ -80,7 +80,7 @@ export const runProton = Effect.fn("Proton.command")(function* (
         binary,
         ...args,
       ],
-      { env, interactive: options.interactive === true },
+      { env, extendEnv: false, interactive: options.interactive === true },
     )
     .pipe(Effect.mapError((error) => describe(binary, error, paths.lock)));
 });

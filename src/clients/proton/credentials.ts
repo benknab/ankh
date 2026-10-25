@@ -83,6 +83,22 @@ const probeStore = Effect.fn("Proton.probeStore")(function* (protection: KeyProt
 // reaches the agent socket in the shared volume decrypt the session without that file.
 const agentConfig = "default-cache-ttl 0\nmax-cache-ttl 0\n";
 
+const writeAgentConfig = Effect.fn("Proton.writeAgentConfig")(
+  function* () {
+    const { fs, path } = yield* Storage;
+    const { gnupg } = yield* ProtonState;
+    const temporary = yield* fs.makeTempDirectoryScoped({
+      directory: gnupg,
+      prefix: "agent-config-",
+    });
+    const file = path.join(temporary, "gpg-agent.conf");
+    yield* fs.writeFileString(file, agentConfig, { mode: 0o600 });
+    yield* fs.rename(file, path.join(gnupg, "gpg-agent.conf"));
+  },
+  Effect.scoped,
+  Effect.mapError(backupError("Proton agent configuration")),
+);
+
 const ensureAgentConfig = Effect.fn("Proton.ensureAgentConfig")(function* () {
   const { fs, path } = yield* Storage;
   const { gnupg } = yield* ProtonState;
@@ -91,13 +107,10 @@ const ensureAgentConfig = Effect.fn("Proton.ensureAgentConfig")(function* () {
     Effect.flatMap((exists) => (exists ? fs.readFileString(file) : Effect.succeed(""))),
     Effect.mapError(backupError("Proton agent configuration")),
   );
-  if (current === agentConfig) {
-    return;
+  if (current !== agentConfig) {
+    yield* writeAgentConfig();
   }
-  yield* fs
-    .writeFileString(file, agentConfig, { mode: 0o600 })
-    .pipe(Effect.mapError(backupError("Proton agent configuration")));
-  // A running agent keeps its old settings until it reloads them.
+  // Always reload: a previous process may have died after writing the file but before reload.
   yield* runProton("gpg-connect-agent", ["RELOADAGENT", "/bye"]);
 });
 

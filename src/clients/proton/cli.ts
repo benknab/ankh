@@ -1,5 +1,5 @@
 import { Array, Context, Effect, HashSet, Layer, Redacted, Schema } from "effect";
-import { backupError, type BackupError } from "#domain/model.ts";
+import { backupError, BackupError } from "#domain/model.ts";
 import { Commands } from "#process/commands.ts";
 import { runProton } from "#clients/proton/command.ts";
 import { verifyCredentials } from "#clients/proton/credentials.ts";
@@ -41,7 +41,13 @@ export class ProtonCli extends Context.Service<
           const nodes = yield* Schema.decodeEffect(type === "file" ? Files : Folders)(
             Redacted.value(result.stdout),
           );
-          return HashSet.fromIterable(Array.map(nodes, (node) => node.name.value));
+          const names = HashSet.fromIterable(Array.map(nodes, (node) => node.name.value));
+          if (HashSet.size(names) !== nodes.length) {
+            return yield* BackupError.make({
+              message: "Proton listing contains duplicate names; resolve them before retrying",
+            });
+          }
+          return names;
         },
         Effect.mapError(backupError("Proton listing")),
       );

@@ -17,7 +17,7 @@ const run = Effect.fn("Commands.run")(
       ChildProcess.make(binary, Array.map(args, reveal), {
         cwd: options.cwd,
         env: Record.map(options.env ?? {}, reveal),
-        extendEnv: true,
+        extendEnv: options.extendEnv ?? true,
         stdin: interactive ? "inherit" : "ignore",
         stdout: interactive ? "inherit" : "pipe",
         stderr: interactive ? "inherit" : "pipe",

@@ -77,3 +77,18 @@ it.live("command output stays exact and hidden even for unknown secrets and spaw
     }
   }).pipe(Effect.provide(infrastructure)),
 );
+
+it.live("an explicit command environment excludes every inherited variable", () =>
+  Effect.gen(function* () {
+    const commands = yield* Commands;
+    const result = yield* commands.run("/usr/bin/env", [], {
+      env: { ANKH_ALLOWED: "public-value" },
+      extendEnv: false,
+    });
+    expect(Redacted.value(result.stdout)).toBe("ANKH_ALLOWED=public-value\n");
+    const inherited = yield* commands.run("/usr/bin/env", [], {
+      env: { ANKH_ALLOWED: "public-value" },
+    });
+    expect(Redacted.value(inherited.stdout)).toContain("PATH=");
+  }).pipe(Effect.provide(infrastructure)),
+);

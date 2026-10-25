@@ -166,7 +166,8 @@ stored in `pass`, encrypted with a GPG key kept in the same volume. Without
 enough to read the session. With it, decryption also needs the read-only secrets
 mount. This does not protect a running container or a host that can read both.
 The GPG agent, whose socket is in the volume, is configured not to cache the
-passphrase. `proton-login` adds the passphrase to an existing key and never
+passphrase; its configuration is published atomically and reloaded on each run.
+`proton-login` adds the passphrase to an existing key and never
 removes one. Proton runs fail if the file is missing for a protected key, or if
 the file was added without logging in again. Changing the passphrase requires
 removing `/proton/gnupg` and `/proton/pass` and logging in again.
@@ -186,10 +187,11 @@ Ankh works around the CLI's limits as follows:
   decrypt round trip there before the browser sign-in, so a broken store cannot
   strand a new session. Each Proton destination run checks the key, its
   protection, and the recipients.
-- **A pinned environment.** Ankh sets the CLI's API host, credential store, cache
-  encryption, and `pass` options, so a stray container variable cannot change
-  them. This is not a boundary against someone who controls the container
-  environment.
+- **An explicit subprocess environment.** Proton tools receive only Ankh's
+  selected variables, including a fixed executable path, API host, credential
+  store, encrypted cache, and `pass` options. Unrelated secrets, proxy settings,
+  and TLS overrides are not inherited. Someone who controls Ankh's own startup
+  environment can still control the parent process.
 - **Fixed failure reasons.** Tool output stays out of logs. Known CLI failures,
   such as a missing or revoked session, are logged as fixed messages that name
   the fix.
@@ -200,7 +202,7 @@ Some limits need manual steps:
   deletes local data. Revoke old sessions in the Proton account's security
   settings.
 - Stopping a container during token refresh can lose the updated session and
-  require another login. Unreadable remote listings fail closed; future-dated
+  require another login. Unreadable or duplicate remote names fail closed; future-dated
   snapshots are excluded from retention and reported without consuming slots.
 - Whoever completes the printed sign-in URL first decides which account Ankh
   uses, and the URL also carries the key for the session handoff. The login

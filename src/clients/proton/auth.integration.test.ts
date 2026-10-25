@@ -226,3 +226,34 @@ it.live("Proton commands wait for the shared state lock and report timeouts", ()
     yield* runProton("gpg", ["--version"]);
   }).pipe(Effect.provideServiceEffect(ProtonState, isolated()), Effect.provide(infrastructure)),
 );
+
+it.live("verification reloads an agent left running with stale cache settings", () =>
+  Effect.gen(function* () {
+    const paths = yield* ProtonState;
+    const { fs } = yield* Storage;
+    const commands = yield* Commands;
+    const { run } = yield* stubbedLogin();
+    yield* fs.writeFileString(paths.passphraseFile, "agent-cache-test\n", { mode: 0o600 });
+    yield* run;
+    const config = `${paths.gnupg}/gpg-agent.conf`;
+    yield* fs.writeFileString(config, "default-cache-ttl 600\nmax-cache-ttl 600\n");
+    yield* runProton("gpg-connect-agent", ["RELOADAGENT", "/bye"]);
+    yield* runProton("pass", ["insert", "--force", "--multiline", "cached-entry"]);
+    yield* runProton("pass", ["show", "cached-entry"]);
+    const withoutPassphrase = commands.run("pass", ["show", "cached-entry"], {
+      env: protonEnvironment(paths, { _tag: "None" }),
+      extendEnv: false,
+    });
+    // Confirm that the old agent really permits decryption before testing the fix.
+    expect(Result.isSuccess(yield* withoutPassphrase.pipe(Effect.result))).toBe(true);
+    // Simulate a process dying between publishing the configuration and reloading the agent.
+    yield* fs.writeFileString(config, "default-cache-ttl 0\nmax-cache-ttl 0\n");
+    yield* verifyCredentials();
+    expect(
+      Result.isFailure(yield* withoutPassphrase.pipe(Effect.result)),
+      "matching on-disk config is not proof that the running agent has disabled its cache",
+    ).toBe(true);
+    yield* runProton("pass", ["show", "cached-entry"]);
+    expect(Result.isFailure(yield* withoutPassphrase.pipe(Effect.result))).toBe(true);
+  }).pipe(Effect.provideServiceEffect(ProtonState, isolated()), Effect.provide(infrastructure)),
+);
