@@ -5,6 +5,7 @@ import { Actions, BackupError, Job } from "../src/model.ts";
 import { Storage, withLock } from "../src/storage.ts";
 import { infrastructure } from "./integration-support.ts";
 import { assert, fixture } from "./support.ts";
+import metadata from "../package.json" with { type: "json" };
 
 it.live("Node runs the TypeScript CLI and rejects unsafe job paths", () =>
   Effect.gen(function* () {
@@ -12,11 +13,14 @@ it.live("Node runs the TypeScript CLI and rejects unsafe job paths", () =>
     const { path } = yield* Storage;
     const entry = path.join(import.meta.dirname, "..", "main.ts");
     const help = yield* commands.run(process.execPath, [entry, "--help"]);
-    for (const action of [...Actions, "schedule", "proton-login"]) {
+    for (const action of [...Actions, "schedule", "proton-login", "validate"]) {
       yield* assert(help.includes(action), `missing subcommand: ${action}`);
     }
     const version = yield* commands.run(process.execPath, [entry, "--version"]);
-    yield* assert(version === "backup-runner v0.1.0", "CLI version must not change");
+    yield* assert(
+      version === `backup-runner v${metadata.version}`,
+      "CLI must use the package version",
+    );
     const invalid = yield* commands
       .run(process.execPath, [entry, "backup", "relative/job.json"])
       .pipe(Effect.result);
@@ -49,6 +53,25 @@ it.live("Node child processes drain large output and report failed exits", () =>
         "failure must preserve exit code and stderr",
       );
     }
+  }).pipe(Effect.provide(infrastructure)),
+);
+
+it.live("validate only reads the job file and rejects unknown fields", () =>
+  Effect.gen(function* () {
+    const { fs, path } = yield* Storage;
+    const commands = yield* Commands;
+    const root = yield* fs.makeTempDirectoryScoped();
+    const file = path.join(root, "job.json");
+    const entry = path.join(import.meta.dirname, "..", "main.ts");
+    yield* fs.writeFileString(file, JSON.stringify(fixture));
+    yield* commands.run(process.execPath, [entry, "validate", file]);
+    yield* fs.writeFileString(file, JSON.stringify({ ...fixture, ignored: true }));
+    yield* assert(
+      Result.isFailure(
+        yield* commands.run(process.execPath, [entry, "validate", file]).pipe(Effect.result),
+      ),
+      "unknown config fields must fail validation",
+    );
   }).pipe(Effect.provide(infrastructure)),
 );
 

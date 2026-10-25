@@ -21,7 +21,16 @@ export class Storage extends Context.Service<
 
 export const loadJob = Effect.fn("loadJob")(function* (file: AbsolutePath) {
   const { fs } = yield* Storage;
-  return yield* Schema.decodeEffect(JobJson)(yield* fs.readFileString(file));
+  return yield* Schema.decodeEffect(JobJson, { onExcessProperty: "error" })(
+    yield* fs.readFileString(file),
+  ).pipe(
+    Effect.mapError(
+      () =>
+        new BackupError({
+          message: "Invalid job configuration; check the schema and path isolation rules",
+        }),
+    ),
+  );
 });
 
 export const checkDrive = Effect.fn("checkDrive")(function* (job: Job) {

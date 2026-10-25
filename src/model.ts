@@ -1,4 +1,4 @@
-import { Brand, Schema } from "effect";
+import { Brand, Cron, HashSet, Result, Schema } from "effect";
 
 export class BackupError extends Schema.TaggedError<
   BackupError,
@@ -12,12 +12,12 @@ export const JobName = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]*
 );
 export type JobName = typeof JobName.Type;
 export const AbsolutePath = Schema.String.check(
-  Schema.isPattern(/^\/(?!$)(?!.*(?:^|\/)\.\.?($|\/))[^\0]+$/),
+  Schema.isPattern(/^\/(?!$)(?!.*(?:^|\/)\.\.?($|\/))(?!.*\/\/)(?!.*\/$)[^\0]+$/),
 ).pipe(Schema.brand("AbsolutePath"));
 export type AbsolutePath = typeof AbsolutePath.Type;
 export const absolutePath = Brand.nominal<AbsolutePath>();
 export const RemoteFolder = Schema.String.check(
-  Schema.isPattern(/^\/my-files\/(?!.*(?:^|\/)\.\.?($|\/))[^\\\0]+[^/]$/),
+  Schema.isPattern(/^\/my-files\/(?!.*(?:^|\/)\.\.?($|\/))[^/\\\0]+(?:\/[^/\\\0]+)*$/),
 ).pipe(Schema.brand("RemoteFolder"));
 export type RemoteFolder = typeof RemoteFolder.Type;
 export const ArchiveName = Schema.String.check(
@@ -43,7 +43,17 @@ export const Sqlite = Schema.Struct({
 });
 export const Gitea = Schema.Struct({
   type: Schema.Literal("gitea-git"),
-  apiUrl: Schema.String.check(Schema.isPattern(/^https?:\/\/[^\s]+$/)),
+  apiUrl: Schema.URLFromString.check(
+    Schema.makeFilter(
+      (url) =>
+        (url.protocol === "https:" || url.protocol === "http:") &&
+        !url.username &&
+        !url.password &&
+        !url.search &&
+        !url.hash,
+      { message: "Use an HTTP(S) base URL without credentials, query, or fragment" },
+    ),
+  ),
   tokenFile: AbsolutePath,
 });
 const PostgresName = Schema.String.check(Schema.isPattern(/^[a-zA-Z_][a-zA-Z0-9_-]*$/)).pipe(
@@ -73,6 +83,20 @@ export type Proton = typeof Proton.Type;
 export const Destination = Schema.Union([Restic, Proton]);
 export type Destination = typeof Destination.Type;
 
+export const JobSchedule = Schema.Struct({
+  cron: Schema.String,
+  timeZone: Schema.String,
+}).check(
+  Schema.makeFilter((schedule) => Result.isSuccess(Cron.parse(schedule.cron, schedule.timeZone)), {
+    message: "Invalid cron expression or time zone",
+  }),
+);
+export type JobSchedule = typeof JobSchedule.Type;
+export const defaultSchedule: JobSchedule = { cron: "30 3 * * *", timeZone: "UTC" };
+
+const overlaps = (a: string, b: string) =>
+  a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
+
 export const Job = Schema.Struct({
   version: Schema.Literal(1),
   name: JobName,
@@ -85,10 +109,39 @@ export const Job = Schema.Struct({
   }),
   destinations: Schema.Array(Destination).check(
     Schema.isMinLength(1),
-    Schema.makeFilter((ds) => new Set(ds.map((d) => d.type)).size === ds.length),
+    Schema.makeFilter(
+      (ds) => HashSet.size(HashSet.fromIterable(ds.map((d) => d.type))) === ds.length,
+    ),
   ),
   retention: Retention,
-});
+  schedule: Schema.optionalKey(JobSchedule),
+}).check(
+  Schema.makeFilter(
+    (job) => {
+      const inputs = [
+        job.backupDrive.sentinelFile,
+        job.source.type === "sqlite"
+          ? job.source.path
+          : job.source.type === "postgres"
+            ? job.source.passwordFile
+            : job.source.tokenFile,
+        ...job.destinations.flatMap((d) => (d.type === "restic" ? [d.passwordFile] : [])),
+      ];
+      const outputs = job.destinations.map((d) => (d.type === "restic" ? d.repository : d.outbox));
+      return (
+        [...inputs, ...outputs].every((p) => !overlaps(p, "/staging") && !overlaps(p, "/proton")) &&
+        outputs.every(
+          (output, index) =>
+            inputs.every((input) => !overlaps(output, input)) &&
+            outputs.slice(index + 1).every((other) => !overlaps(output, other)),
+        )
+      );
+    },
+    {
+      message: "Source, secrets, sentinel, and destinations must not overlap writable state paths",
+    },
+  ),
+);
 export type Job = typeof Job.Type;
 export const JobJson = Schema.fromJsonString(Job);
 export const Actions = ["init", "backup", "retry", "check", "check-read-data"] as const;

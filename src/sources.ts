@@ -23,7 +23,7 @@ const stage = Effect.fn("Sources.stage")(
       yield* privateDirectory(directory);
       const output = path.join(directory, source.output);
       yield* commands.run("sqlite3", [
-        `file:${source.path}?mode=ro`,
+        `file:${source.path.split("/").map(encodeURIComponent).join("/")}?mode=ro`,
         ".timeout 60000",
         `.backup ${output}`,
       ]);
@@ -64,7 +64,7 @@ const stage = Effect.fn("Sources.stage")(
     const token = (yield* fs.readFileString(source.tokenFile)).trim();
     yield* Schema.decodeEffect(Schema.NonEmptyString)(token);
     const client = (yield* HttpClient.HttpClient).pipe(HttpClient.filterStatusOk);
-    const base = source.apiUrl.replace(/\/$/, "");
+    const base = source.apiUrl.href.replace(/\/$/, "");
     const repositories: Array<(typeof Repositories.Type)[number]> = [];
     for (let page = 1; ; page++) {
       const response = yield* client.get(`${base}/api/v1/user/repos`, {

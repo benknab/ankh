@@ -36,3 +36,28 @@ for (const [season, utcHour] of [
     }),
   );
 }
+
+for (const [before, nextDayHours] of [
+  ["2026-03-28T02:29:00Z", 23],
+  ["2026-10-24T01:29:00Z", 25],
+] as const) {
+  it.effect(`configured scheduler follows DST after ${before}`, () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(DateTime.toEpochMillis(DateTime.makeUnsafe(before)));
+      const attempts = yield* Ref.make(0);
+      const fiber = yield* Effect.forkChild(
+        scheduledAttempts(
+          Ref.update(attempts, (n) => n + 1),
+          { cron: "30 3 * * *", timeZone: "Europe/Paris" },
+        ),
+      );
+      yield* TestClock.adjust("1 minute");
+      yield* assert((yield* Ref.get(attempts)) === 1, "first local run must occur");
+      yield* TestClock.adjust(nextDayHours * 60 * 60 * 1000 - 1);
+      yield* assert((yield* Ref.get(attempts)) === 1, "must wait for the next local run");
+      yield* TestClock.adjust(1);
+      yield* assert((yield* Ref.get(attempts)) === 2, "DST must preserve local scheduled time");
+      yield* Fiber.interrupt(fiber);
+    }),
+  );
+}
