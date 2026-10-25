@@ -80,3 +80,19 @@ export const expiredSnapshots = (
   );
   return HashSet.difference(HashSet.fromIterable(Array.map(snapshots, (s) => s.name)), keep);
 };
+
+export const retentionCandidates = Effect.fn("retentionCandidates")(function* (
+  snapshots: readonly Snapshot[],
+) {
+  const now = yield* DateTime.now;
+  const candidates = Array.filter(
+    snapshots,
+    (snapshot) => !DateTime.isGreaterThan(snapshot.time, now),
+  );
+  if (candidates.length !== snapshots.length) {
+    yield* Effect.logWarning(
+      "Future-dated Proton snapshots were excluded from retention; check the clock",
+    );
+  }
+  return candidates;
+});

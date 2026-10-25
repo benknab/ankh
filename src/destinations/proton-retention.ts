@@ -2,7 +2,7 @@ import { Array, Effect, HashSet, Option, Schema } from "effect";
 import { ArchiveName, BackupError, type Job, type Proton, RemoteFolder } from "#domain/model.ts";
 import { ProtonDrive } from "#clients/proton/client.ts";
 import { archiveTime } from "#domain/archive.ts";
-import { expiredSnapshots, parseSnapshotPairs } from "#domain/retention.ts";
+import { expiredSnapshots, parseSnapshotPairs, retentionCandidates } from "#domain/retention.ts";
 import { privateDirectory, Storage } from "#storage/storage.ts";
 
 const Intent = Schema.fromJsonString(
@@ -63,6 +63,8 @@ export const retainProton = Effect.fn("Proton.retain")(function* (job: Job, dest
   yield* privateDirectory(destination.outbox);
   const journal = path.join(destination.outbox, `.retention-${job.name}.json`);
   yield* recover(job, destination, journal);
-  const snapshots = yield* parseSnapshotPairs(job.name, yield* proton.list(destination));
+  const snapshots = yield* parseSnapshotPairs(job.name, yield* proton.list(destination)).pipe(
+    Effect.flatMap(retentionCandidates),
+  );
   yield* removeExpired(destination, journal, expiredSnapshots(snapshots, job.retention));
 });

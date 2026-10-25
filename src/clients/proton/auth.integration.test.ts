@@ -178,6 +178,13 @@ it.live("a password store for another key fails before the browser login", () =>
     expect(messageOf(yield* verifyCredentials().pipe(Effect.result))).toContain(
       "overrides the Proton key",
     );
+    yield* fs.remove(`${paths.passwordStore}/.gpg-id`);
+    yield* fs.writeFileString(`${session}/.gpg-id`, recipients);
+    expect(
+      messageOf(yield* run.pipe(Effect.result)),
+      "first-time store setup must reject even a decryptable nested recipient",
+    ).toContain("overrides the Proton key");
+    expect(yield* fs.exists(`${paths.passwordStore}/.gpg-id`)).toBe(false);
     expect(yield* Ref.get(logins), "mismatched stores must not start a login").toHaveLength(1);
   }).pipe(Effect.provideServiceEffect(ProtonState, isolated()), Effect.provide(infrastructure)),
 );

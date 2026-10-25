@@ -2,7 +2,8 @@ import { expect, it } from "@effect/vitest";
 import { Array, DateTime, Effect, HashSet, Result, Schema } from "effect";
 import { JobName } from "#domain/model.ts";
 import { archiveName } from "#domain/archive.ts";
-import { expiredSnapshots, parseSnapshotPairs } from "#domain/retention.ts";
+import { TestClock } from "effect/testing";
+import { expiredSnapshots, parseSnapshotPairs, retentionCandidates } from "#domain/retention.ts";
 
 it.effect("retention consumes parsed snapshots and keeps newest per UTC period", () =>
   Effect.gen(function* () {
@@ -48,5 +49,23 @@ it.effect("retention keeps 14 daily, 8 weekly, 12 monthly, and 5 yearly periods"
         `${test.policy} count is wrong`,
       ).toBe(20 - test.count);
     }
+  }),
+);
+
+it.effect("future snapshots neither consume retention slots nor become deletion candidates", () =>
+  Effect.gen(function* () {
+    const job = yield* Schema.decodeEffect(JobName)("test-job");
+    const times = ["2024-01-01", "2025-01-01", "2099-01-01"];
+    const snapshots = Array.map(times, (value) => {
+      const time = DateTime.makeUnsafe(`${value}T00:00:00Z`);
+      return { name: archiveName(job, time), time };
+    });
+    const policy = { daily: 0, weekly: 0, monthly: 0, yearly: 1 };
+    yield* TestClock.setTime(DateTime.toEpochMillis(DateTime.makeUnsafe("2026-01-01T00:00:00Z")));
+    expect(
+      Array.fromIterable(expiredSnapshots(yield* retentionCandidates(snapshots), policy)),
+    ).toEqual([snapshots[0]?.name]);
+    yield* TestClock.setTime(DateTime.toEpochMillis(DateTime.makeUnsafe("2099-01-01T00:00:00Z")));
+    expect(HashSet.size(expiredSnapshots(yield* retentionCandidates(snapshots), policy))).toBe(2);
   }),
 );

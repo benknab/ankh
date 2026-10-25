@@ -18,6 +18,7 @@ RUN apt-get update \
     restic \
     sqlite3 \
     tar \
+    util-linux \
     wget \
     zstd \
     && wget --quiet \
@@ -30,6 +31,10 @@ RUN apt-get update \
 
 RUN wget --quiet --output-document=/usr/share/keyrings/postgresql.asc \
       https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+    && mkdir -m 0700 /tmp/pg-key-check \
+    && gpg --homedir /tmp/pg-key-check --batch --with-colons --show-keys /usr/share/keyrings/postgresql.asc > /tmp/pg-keys \
+    && test "$(awk -F: '$1 == "pub" { primary = 1; next } primary && $1 == "fpr" { print $10; primary = 0 }' /tmp/pg-keys)" = B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8 \
+    && rm -rf /tmp/pg-key-check /tmp/pg-keys \
     && . /etc/os-release \
     && printf 'deb [signed-by=/usr/share/keyrings/postgresql.asc] https://apt.postgresql.org/pub/repos/apt %s-pgdg main\n' "$VERSION_CODENAME" > /etc/apt/sources.list.d/pgdg.list \
     && apt-get update \
@@ -38,15 +43,18 @@ RUN wget --quiet --output-document=/usr/share/keyrings/postgresql.asc \
 
 WORKDIR /app
 
-RUN npm install --global pnpm@12.15.0
-
 COPY LICENSE THIRD_PARTY_NOTICES.md /usr/local/share/doc/ankh/
 LABEL org.opencontainers.image.source="https://github.com/benknab/ankh" \
       org.opencontainers.image.licenses="MIT"
 
-FROM base AS runner
+FROM base AS dependencies
+RUN npm install --global pnpm@12.15.0
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile --prod --ignore-scripts
+
+FROM base AS runner
+COPY --from=dependencies /app/node_modules ./node_modules
+COPY package.json ./
 COPY src ./src
 RUN find src -type f -name '*.test.ts' -delete && rm -rf src/testing
 COPY gitea-askpass.sh /app/gitea-askpass.sh

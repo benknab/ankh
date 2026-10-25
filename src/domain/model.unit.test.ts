@@ -99,6 +99,10 @@ it.effect("Proton folders validate every segment including one-character names",
       "/my-files/a/..",
       "/my-files/a\\",
       "/my-files/a\0",
+      "/my-files/-a",
+      "/my-files/a/--help",
+      "/my-files/a~b",
+      "/my-files/a\n",
     ]) {
       expect(
         Result.isFailure(yield* Schema.decodeEffect(RemoteFolder)(folder).pipe(Effect.result)),

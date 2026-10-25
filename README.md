@@ -141,6 +141,10 @@ To require a passphrase for the stored credentials, write it as one line to
 again. Every container that uses the volume then needs the same file. See
 [Security](#security) for what this protects.
 
+Set `PROTON_SECRETS_DIR` to give the login container a directory containing only
+`proton-gpg-passphrase`; it defaults to `SECRETS_DIR`. Backup containers still
+read that same passphrase from `SECRETS_DIR/proton-gpg-passphrase`.
+
 ## Security
 
 Proton publishes a Drive SDK, but not its sign-in and session handling, so Ankh
@@ -166,6 +170,9 @@ passphrase. `proton-login` adds the passphrase to an existing key and never
 removes one. Proton runs fail if the file is missing for a protected key, or if
 the file was added without logging in again. Changing the passphrase requires
 removing `/proton/gnupg` and `/proton/pass` and logging in again.
+Adding a passphrase cannot protect earlier copies of an unprotected key. If state
+may have leaked, revoke the sessions, change the Proton account password, and
+recreate the key and store before logging in again.
 
 Ankh works around the CLI's limits as follows:
 
@@ -192,6 +199,9 @@ Some limits need manual steps:
 - Logging in again does not revoke the previous session; the CLI's logout only
   deletes local data. Revoke old sessions in the Proton account's security
   settings.
+- Stopping a container during token refresh can lose the updated session and
+  require another login. Unreadable remote listings fail closed; future-dated
+  snapshots are excluded from retention and reported without consuming slots.
 - Whoever completes the printed sign-in URL first decides which account Ankh
   uses, and the URL also carries the key for the session handoff. The login
   services disable Docker logging; keep the terminal output private as well, and

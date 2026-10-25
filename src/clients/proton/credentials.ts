@@ -52,10 +52,14 @@ const checkRecipients = Effect.fn("Proton.checkRecipients")(function* (
 const ensureStore = Effect.fn("Proton.ensureStore")(function* (fingerprint: string) {
   const current = yield* recipients();
   if (Option.isNone(current)) {
+    // Check nested recipients before pass init can re-encrypt any existing entries.
+    yield* checkRecipients(fingerprint, [fingerprint]);
     yield* runProton("pass", ["init", fingerprint]);
-    return;
   }
-  yield* checkRecipients(fingerprint, current.value);
+  yield* checkRecipients(
+    fingerprint,
+    Option.getOrElse(current, () => [fingerprint]),
+  );
 });
 
 // Prove that pass can encrypt and decrypt before the browser login creates a remote session.

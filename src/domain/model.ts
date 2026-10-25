@@ -34,7 +34,9 @@ export const driveLockPath = (sentinel: AbsolutePath): AbsolutePath =>
   absolutePath(`${sentinel.slice(0, sentinel.lastIndexOf("/"))}/.runner-lock`);
 export const protonPassphraseFile = absolutePath("/secrets/proton-gpg-passphrase");
 export const RemoteFolder = Schema.String.check(
-  Schema.isPattern(/^\/my-files\/(?!.*(?:^|\/)\.\.?($|\/))[^/\\\0]+(?:\/[^/\\\0]+)*$/u),
+  Schema.isPattern(
+    /^\/my-files\/(?!.*(?:^|\/)\.\.?($|\/))(?!-)(?!.*\/-)[^/\\~\p{Cc}]+(?:\/[^/\\~\p{Cc}]+)*$/u,
+  ),
 ).pipe(Schema.brand("RemoteFolder"));
 export type RemoteFolder = typeof RemoteFolder.Type;
 export const ArchiveName = Schema.String.check(
