@@ -1,9 +1,8 @@
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer } from "effect";
 import { backupError, type BackupError, type Postgres } from "#domain/model.ts";
 import { Commands } from "#process/commands.ts";
 import { Storage } from "#storage/storage.ts";
-
-const Password = Schema.NonEmptyString.check(Schema.isPattern(/^[^\0]+$/u));
+import { readSecret } from "#storage/secrets.ts";
 
 export class PostgresClient extends Context.Service<
   PostgresClient,
@@ -18,11 +17,12 @@ export class PostgresClient extends Context.Service<
     PostgresClient,
     Effect.gen(function* () {
       const commands = yield* Commands;
-      const { fs } = yield* Storage;
+      const storage = yield* Storage;
       const dump = Effect.fn("PostgresClient.dump")(
         function* (source: typeof Postgres.Type, target: string) {
-          const content = yield* fs.readFileString(source.passwordFile);
-          const password = yield* Schema.decodeEffect(Password)(content.replace(/\r?\n$/u, ""));
+          const password = yield* readSecret(source.passwordFile, "line-ending").pipe(
+            Effect.provideService(Storage, storage),
+          );
           yield* commands.run("pg_dump", ["--no-password", "--format=custom", "--file", target], {
             env: {
               PGHOST: source.hostname,

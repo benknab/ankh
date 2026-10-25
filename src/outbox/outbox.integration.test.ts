@@ -1,5 +1,16 @@
 import { expect, it } from "@effect/vitest";
-import { Array, DateTime, Effect, Exit, Layer, Option, Ref, Result, Schema } from "effect";
+import {
+  Array,
+  DateTime,
+  Effect,
+  Exit,
+  Layer,
+  Option,
+  Redacted,
+  Ref,
+  Result,
+  Schema,
+} from "effect";
 import { Commands } from "#process/commands.ts";
 import { absolutePath, BackupError, Job, Proton } from "#domain/model.ts";
 import { Outbox } from "#outbox/outbox.ts";
@@ -71,7 +82,9 @@ it.live("durable outbox survives failure, retries through Queue, and restores SQ
       path.join(restore, "test-job/test.db"),
       "SELECT value FROM records;",
     ]);
-    expect(value.stdout, "archive must restore the original database").toBe("verified");
+    expect(Redacted.value(value.stdout).trim(), "archive must restore the original database").toBe(
+      "verified",
+    );
     yield* Effect.logInfo("Restore verified", DateTime.formatIso(yield* DateTime.now));
   }).pipe(Effect.provide(outboxInfrastructure)),
 );

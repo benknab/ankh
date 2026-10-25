@@ -1,4 +1,4 @@
-import { Array, type Cause, Context, Effect, Layer, Queue, Result, Stream } from "effect";
+import { type Cause, Context, Effect, Layer, Queue, Redacted, Result, Stream } from "effect";
 import { ArchiveClient } from "#clients/archive.ts";
 import type { Archive } from "#domain/archive.ts";
 import {
@@ -31,19 +31,23 @@ const drain = Effect.fn("Outbox.drain")(function* (
   yield* Effect.addFinalizer(() => Queue.shutdown(queue));
   yield* Queue.offerAll(queue, yield* list(job, destination));
   yield* Queue.end(queue);
-  const failures: string[] = [];
+  const failures: BackupError[] = [];
   yield* Stream.fromQueue(queue).pipe(
     Stream.runForEach(
       Effect.fn("Outbox.attempt")(function* (archive) {
         const result = yield* deliver(archive, upload).pipe(Effect.result);
         if (Result.isFailure(result)) {
-          failures.push(`${archive.name}: ${String(result.failure)}`);
+          failures.push(backupError("Outbox delivery")(result.failure));
         }
       }),
     ),
   );
   if (failures.length > 0) {
-    return yield* BackupError.make({ message: Array.join(failures, "; ") });
+    return yield* BackupError.make({
+      message: `${failures.length} outbox deliveries failed`,
+      operation: "Outbox delivery",
+      cause: Redacted.make(failures),
+    });
   }
 }, Effect.scoped);
 

@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { Effect, Result, Schema } from "effect";
+import { Effect, Redacted, Result, Schema } from "effect";
 import { Commands } from "#process/commands.ts";
 import { Actions, BackupError, Job } from "#domain/model.ts";
 import { Storage, withLock } from "#storage/storage.ts";
@@ -14,10 +14,10 @@ it.live("Node runs the TypeScript CLI and rejects unsafe job paths", () =>
     const entry = path.join(import.meta.dirname, "main.ts");
     const help = yield* commands.run(process.execPath, [entry, "--help"]);
     for (const action of [...Actions, "schedule", "proton-login", "validate"]) {
-      expect(help.stdout).toContain(action);
+      expect(Redacted.value(help.stdout)).toContain(action);
     }
     const version = yield* commands.run(process.execPath, [entry, "--version"]);
-    expect(version.stdout, "CLI must use the package version").toBe(
+    expect(Redacted.value(version.stdout).trim(), "CLI must use the package version").toBe(
       `backup-runner v${metadata.version}`,
     );
     const invalid = yield* commands
@@ -36,7 +36,7 @@ it.live("Node child processes drain large output and report failed exits", () =>
       "--eval",
       'process.stdout.write("o".repeat(256 * 1024)); process.stderr.write("e".repeat(256 * 1024));',
     ]);
-    expect(output.stdout, "stdout and stderr must drain without deadlock").toBe(
+    expect(Redacted.value(output.stdout), "stdout and stderr must drain without deadlock").toBe(
       "o".repeat(256 * 1024),
     );
     const failed = yield* commands
@@ -48,7 +48,11 @@ it.live("Node child processes drain large output and report failed exits", () =>
     expect(Result.isFailure(failed), "nonzero exit must fail").toBe(true);
     if (Result.isFailure(failed)) {
       expect(failed.failure.exitCode).toBe(7);
-      expect(failed.failure.message).toContain("probe-failure");
+      expect(failed.failure.message).not.toContain("probe-failure");
+      expect(failed.failure.cause).toBeDefined();
+      if (failed.failure.cause !== undefined) {
+        expect(Redacted.value(failed.failure.cause)).toMatchObject({ stderr: "probe-failure" });
+      }
     }
   }).pipe(Effect.provide(infrastructure)),
 );
@@ -78,9 +82,9 @@ it.live("validate only reads the job file and rejects unknown fields", () =>
           annotations: Schema.Struct({ operation: Schema.Literal("validate") }),
         }),
       ),
-    )(validation.stdout);
+    )(Redacted.value(validation.stdout));
     expect(line.message.operation).toBe(line.annotations.operation);
-    expect(validation.stdout).not.toContain('"runId"');
+    expect(Redacted.value(validation.stdout)).not.toContain('"runId"');
     yield* fs.writeFileString(
       file,
       yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({

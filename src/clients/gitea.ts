@@ -1,7 +1,8 @@
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer, Redacted, Schema } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
 import { backupError, type BackupError, type Gitea } from "#domain/model.ts";
 import { Storage } from "#storage/storage.ts";
+import { readSecret } from "#storage/secrets.ts";
 
 const Repository = Schema.Struct({
   full_name: Schema.String.check(
@@ -23,17 +24,17 @@ export class GiteaClient extends Context.Service<
     GiteaClient,
     Effect.gen(function* () {
       const client = (yield* HttpClient.HttpClient).pipe(HttpClient.filterStatusOk);
-      const { fs } = yield* Storage;
+      const storage = yield* Storage;
       const repositories = Effect.fn("GiteaClient.repositories")(
         function* (source: typeof Gitea.Type) {
-          const token = yield* Schema.decodeEffect(Schema.NonEmptyString)(
-            (yield* fs.readFileString(source.tokenFile)).trim(),
+          const token = yield* readSecret(source.tokenFile).pipe(
+            Effect.provideService(Storage, storage),
           );
           const base = source.apiUrl.href.replace(/\/$/u, "");
           const result: Repository[] = [];
           for (let page = 1; ; page += 1) {
             const response = yield* client.get(`${base}/api/v1/user/repos`, {
-              headers: { Authorization: `token ${token}` },
+              headers: { Authorization: `token ${Redacted.value(token)}` },
               urlParams: { limit: 50, page },
             });
             const batch = yield* HttpClientResponse.schemaBodyJson(Repositories)(response);

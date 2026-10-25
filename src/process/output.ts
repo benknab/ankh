@@ -1,17 +1,18 @@
-import { Array, Record, Stream, type Effect } from "effect";
+import { Stream, type Effect, type Redacted } from "effect";
+
+export type Argument = string | Redacted.Redacted;
 
 export interface CommandOutput {
-  readonly stdout: string;
-  readonly stderr: string;
+  readonly stdout: Redacted.Redacted;
+  readonly stderr: Redacted.Redacted;
   readonly exitCode: 0;
 }
 
 export interface Options {
   readonly cwd?: string;
-  readonly env?: Readonly<Record<string, string>>;
+  readonly env?: Readonly<Record<string, Argument>>;
   readonly interactive?: boolean;
   readonly output?: "capture" | "tail";
-  readonly redact?: readonly string[];
 }
 
 interface Capture {
@@ -39,16 +40,3 @@ export const capture = <E, R>(
           };
     },
   );
-
-export const redact = (text: string, options: Options): string => {
-  const environment = Record.toEntries(options.env ?? {});
-  const sensitive = Array.filter(
-    environment,
-    ([key]) => /PASSWORD|TOKEN|SECRET/u.test(key) && !key.endsWith("_FILE"),
-  );
-  const secrets = Array.filter(
-    [...(options.redact ?? []), ...Array.map(sensitive, ([, value]) => value)],
-    (value) => value.length > 0,
-  );
-  return Array.reduce(secrets, text, (value, secret) => value.replaceAll(secret, "[redacted]"));
-};

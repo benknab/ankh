@@ -1,4 +1,4 @@
-import { Array, Brand, Cron, HashSet, Result, Schema } from "effect";
+import { Array, Brand, Cron, HashSet, Redacted, Result, Schema } from "effect";
 
 export class BackupError extends Schema.TaggedError<
   BackupError,
@@ -7,7 +7,7 @@ export class BackupError extends Schema.TaggedError<
   message: Schema.String,
   operation: Schema.optionalKey(Schema.String),
   exitCode: Schema.optionalKey(Schema.Int),
-  cause: Schema.optionalKey(Schema.Defect()),
+  cause: Schema.optionalKey(Schema.Redacted(Schema.Unknown, { disallowJsonEncode: true })),
 }) {}
 
 export const backupError =
@@ -15,7 +15,11 @@ export const backupError =
   (cause: unknown): BackupError =>
     Schema.is(BackupError)(cause)
       ? cause
-      : BackupError.make({ message: `${operation} failed`, operation, cause });
+      : BackupError.make({
+          message: `${operation} failed`,
+          operation,
+          cause: Redacted.make(cause),
+        });
 
 export const JobName = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]*$/u)).pipe(
   Schema.brand("JobName"),

@@ -1,4 +1,4 @@
-import { Array, Effect, Result } from "effect";
+import { Array, Effect, Redacted, Result } from "effect";
 import { Destinations } from "#destinations/destinations.ts";
 import {
   type AbsolutePath,
@@ -31,11 +31,11 @@ export const execute = Effect.fn("Runner.execute")(function* (job: Job, action: 
   if (failures.length > 0) {
     return yield* BackupError.make({
       message: Array.join(
-        Array.map(failures, ({ destination, error }) => `${destination}: ${error.message}`),
+        Array.map(failures, ({ destination }) => `${destination} failed`),
         "; ",
       ),
       operation: "Destinations",
-      cause: failures,
+      cause: Redacted.make(failures),
     });
   }
 });

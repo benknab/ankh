@@ -1,5 +1,16 @@
 import { expect, it } from "@effect/vitest";
-import { Array, Deferred, Effect, Exit, Fiber, Layer, Logger, References, Schema } from "effect";
+import {
+  Array,
+  Deferred,
+  Effect,
+  Exit,
+  Fiber,
+  Layer,
+  Logger,
+  Redacted,
+  References,
+  Schema,
+} from "effect";
 import { TestClock } from "effect/testing";
 import { BackupError, Job } from "#domain/model.ts";
 import { describeJob, track, withExecution } from "#telemetry/execution.ts";
@@ -93,7 +104,7 @@ for (const mode of ["failure", "defect", "interrupted", "cleanup"] as const) {
             message: secret,
             exitCode: 7,
             operation: secret,
-            cause: secret,
+            cause: Redacted.make(secret),
           });
         }
         if (mode === "defect") {

@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer } from "effect";
 import {
   type AbsolutePath,
   backupError,
@@ -8,6 +8,7 @@ import {
 } from "#domain/model.ts";
 import { Commands } from "#process/commands.ts";
 import { Storage } from "#storage/storage.ts";
+import { readSecret } from "#storage/secrets.ts";
 
 interface SnapshotRequest {
   readonly stage: AbsolutePath;
@@ -18,11 +19,8 @@ interface SnapshotRequest {
 
 const run = Effect.fn("ResticClient.run")(
   function* (destination: Restic, args: readonly string[]) {
-    const { fs } = yield* Storage;
     const commands = yield* Commands;
-    yield* Schema.decodeEffect(Schema.NonEmptyString)(
-      (yield* fs.readFileString(destination.passwordFile)).trim(),
-    );
+    yield* readSecret(destination.passwordFile);
     yield* commands.run("restic", args, {
       output: "tail",
       env: {

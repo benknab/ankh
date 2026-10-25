@@ -1,5 +1,16 @@
 import { expect, it } from "@effect/vitest";
-import { Array, Effect, HashSet, Layer, Logger, Option, Ref, Result, Schema } from "effect";
+import {
+  Array,
+  Effect,
+  HashSet,
+  Layer,
+  Logger,
+  Option,
+  Redacted,
+  Ref,
+  Result,
+  Schema,
+} from "effect";
 import { FetchHttpClient } from "effect/http";
 import { Commands } from "#process/commands.ts";
 import { Destinations } from "#destinations/destinations.ts";
@@ -90,7 +101,10 @@ it.live("real SQLite and Restic survive Proton failure, then retry and restore b
     expect(Result.isFailure(failed), "offline Proton must fail the whole job").toBe(true);
     const env = { RESTIC_REPOSITORY: repository, RESTIC_PASSWORD_FILE: password };
     const snapshots = yield* commands.run("restic", ["snapshots", "--json"], { env });
-    expect(snapshots.stdout, "Restic snapshot must survive Proton failure").toContain("test-host");
+    expect(
+      Redacted.value(snapshots.stdout),
+      "Restic snapshot must survive Proton failure",
+    ).toContain("test-host");
     yield* Ref.set(online, true);
     // A retry must not depend on the source still being available.
     yield* fs.remove(source);
@@ -133,7 +147,9 @@ it.live("real SQLite and Restic survive Proton failure, then retry and restore b
       path.join(restored, "staging/test-job/test.db"),
       "SELECT value FROM records;",
     ]);
-    expect(value.stdout, "Restic must restore the staged database").toBe("verified");
+    expect(Redacted.value(value.stdout).trim(), "Restic must restore the staged database").toBe(
+      "verified",
+    );
     const archive = Option.getOrThrow(
       Array.findFirst(yield* fs.readDirectory(remote), (name) => name.endsWith(".tar.zst")),
     );
@@ -150,7 +166,10 @@ it.live("real SQLite and Restic survive Proton failure, then retry and restore b
       path.join(remote, "test-job/test.db"),
       "SELECT value FROM records;",
     ]);
-    expect(offsite.stdout, "Proton archive must restore the same database").toBe("verified");
+    expect(
+      Redacted.value(offsite.stdout).trim(),
+      "Proton archive must restore the same database",
+    ).toBe("verified");
     expect(
       yield* fs.exists(path.join(root, ".runner-lock")),
       "scope must release drive lock after failure and success",

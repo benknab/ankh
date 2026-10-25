@@ -1,6 +1,6 @@
 import { expect, it } from "@effect/vitest";
 import { Array, DateTime, Effect, HashSet, Layer, Ref, Result, Schema } from "effect";
-import { Commands } from "#process/commands.ts";
+import { type Argument, Commands } from "#process/commands.ts";
 import { absolutePath, BackupError, JobName, Proton } from "#domain/model.ts";
 import { ProtonDrive } from "#clients/proton/client.ts";
 import { archiveName } from "#domain/archive.ts";
@@ -23,7 +23,7 @@ const listing = Effect.fn("Test.listing")((names: Iterable<string>) =>
 it.effect("folder initialization only creates names missing from a successful listing", () =>
   Effect.gen(function* () {
     const destination = yield* destinationConfig;
-    const calls = yield* Ref.make<readonly string[][]>([]);
+    const calls = yield* Ref.make<readonly Argument[][]>([]);
     const commands = Commands.of({
       run: (_binary, args) =>
         Ref.update(calls, (all) => [...all, [...args]]).pipe(Effect.as(output("[]"))),

@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { Effect, Layer, Schema } from "effect";
+import { Effect, Layer, Redacted, Schema } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { Commands } from "#process/commands.ts";
 import { Job } from "#domain/model.ts";
@@ -26,8 +26,12 @@ it.live("SQLite staging preserves URI-special characters in source paths", () =>
     });
     const staged = yield* sources.stage(job);
     expect(
-      (yield* commands.run("sqlite3", [path.join(staged, "test.db"), "SELECT value FROM records;"]))
-        .stdout,
+      Redacted.value(
+        (yield* commands.run("sqlite3", [
+          path.join(staged, "test.db"),
+          "SELECT value FROM records;",
+        ])).stdout,
+      ).trim(),
       "staging must read the exact source path",
     ).toBe("verified");
   }).pipe(

@@ -1,4 +1,4 @@
-import { Array, Context, Effect, Layer, Schema } from "effect";
+import { Array, Context, Effect, Layer, Redacted, Schema } from "effect";
 import { type AbsolutePath, backupError, type BackupError } from "#domain/model.ts";
 import { Commands } from "#process/commands.ts";
 
@@ -26,7 +26,7 @@ export class SqliteClient extends Context.Service<
             `.backup ${target}`,
           ]);
           const result = yield* commands.run("sqlite3", [target, "PRAGMA quick_check;"]);
-          yield* Schema.decodeUnknownEffect(Integrity)(result.stdout);
+          yield* Schema.decodeUnknownEffect(Integrity)(Redacted.value(result.stdout).trim());
         },
         Effect.mapError(backupError("SQLite backup verification")),
       );

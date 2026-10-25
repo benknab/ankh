@@ -22,10 +22,8 @@ export class GitClient extends Context.Service<
       const storage = yield* Storage;
       const mirror = Effect.fn("GitClient.mirror")(
         function* (repository: GitRepository) {
-          const token = (yield* storage.fs.readFileString(repository.tokenFile)).trim();
           const options: Options = {
             output: "tail",
-            redact: [token],
             env: {
               GIT_ASKPASS: "/app/gitea-askpass.sh",
               GIT_TERMINAL_PROMPT: "0",

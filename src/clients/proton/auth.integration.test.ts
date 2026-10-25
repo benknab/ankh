@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Redacted } from "effect";
 import { login } from "#clients/proton/auth.ts";
 import { Commands } from "#process/commands.ts";
 import { protonEnvironment } from "#clients/proton/state.ts";
@@ -36,7 +36,7 @@ it.live("Proton credential setup creates a usable encryption key", () =>
     const decrypted = yield* commands.run("gpg", ["--batch", "--decrypt", "/proton/probe.gpg"], {
       env: protonEnvironment,
     });
-    expect(decrypted.stdout, "session encryption key must support decryption").toBe(
+    expect(Redacted.value(decrypted.stdout), "session encryption key must support decryption").toBe(
       "credential-round-trip",
     );
     // A second login setup must reuse the existing key and store.

@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { Effect, Layer, Result, Schema } from "effect";
+import { Effect, Layer, Redacted, Result, Schema } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { Commands } from "#process/commands.ts";
 import { Job } from "#domain/model.ts";
@@ -19,7 +19,7 @@ it.live("PostgreSQL source dumps and restores data, and rejects bad credentials"
     const env = {
       PGHOST: "postgres-test",
       PGUSER: "postgres",
-      PGPASSWORD: "integration-test-only",
+      PGPASSWORD: Redacted.make("integration-test-only"),
       PGDATABASE: "postgres",
     };
     for (const database of ["source_test", "restore_test"]) {
@@ -71,7 +71,7 @@ it.live("PostgreSQL source dumps and restores data, and rejects bad credentials"
       ],
       { env: { ...env, PGDATABASE: "restore_test" } },
     );
-    expect(value.stdout, "dump must restore original data").toBe("verified");
+    expect(Redacted.value(value.stdout).trim(), "dump must restore original data").toBe("verified");
     yield* fs.writeFileString(passwordFile, "wrong-password");
     const failed = yield* sources.stage(job).pipe(Effect.result);
     expect(Result.isFailure(failed), "bad credentials must fail staging").toBe(true);

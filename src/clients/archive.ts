@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer, Redacted, Schema } from "effect";
 import type { Archive } from "#domain/archive.ts";
 import { type AbsolutePath, backupError, type BackupError } from "#domain/model.ts";
 import { Commands } from "#process/commands.ts";
@@ -34,7 +34,7 @@ const create = Effect.fn("ArchiveClient.create")(function* (stage: AbsolutePath,
   ]);
   yield* fs.chmod(archive.file, 0o600);
   const checksum = yield* commands.run("sha256sum", [archive.name], { cwd: archive.directory });
-  yield* fs.writeFileString(archive.checksum, `${checksum.stdout}\n`, { mode: 0o600 });
+  yield* fs.writeFileString(archive.checksum, Redacted.value(checksum.stdout), { mode: 0o600 });
   yield* verify(archive);
 });
 

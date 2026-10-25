@@ -1,4 +1,4 @@
-import { Array, Context, Effect, HashSet, Layer, Schema } from "effect";
+import { Array, Context, Effect, HashSet, Layer, Redacted, Schema } from "effect";
 import { backupError, type BackupError } from "#domain/model.ts";
 import { Commands } from "#process/commands.ts";
 import { protonEnvironment } from "#clients/proton/state.ts";
@@ -34,7 +34,7 @@ export class ProtonCli extends Context.Service<
         function* (folder: string, type: "file" | "folder") {
           const result = yield* run(["list", "--json", "--type", type, folder]);
           const nodes = yield* Schema.decodeEffect(type === "file" ? Files : Folders)(
-            result.stdout,
+            Redacted.value(result.stdout),
           );
           return HashSet.fromIterable(Array.map(nodes, (node) => node.name.value));
         },

@@ -1,4 +1,4 @@
-import { Array, Effect, Option, Schema } from "effect";
+import { Array, Effect, Option, Redacted, Schema } from "effect";
 import { Commands } from "#process/commands.ts";
 import { backupError } from "#domain/model.ts";
 import { protonEnvironment } from "#clients/proton/state.ts";
@@ -14,7 +14,7 @@ const ensureIdentity = Effect.fn("Proton.ensureIdentity")(function* () {
     ["--batch", "--with-colons", "--list-secret-keys"],
     options,
   );
-  if (!keys.stdout.includes(identity)) {
+  if (!Redacted.value(keys.stdout).includes(identity)) {
     yield* commands.run(
       "gpg",
       [
@@ -42,7 +42,7 @@ const readKey = Effect.fn("Proton.readKey")(
       ["--batch", "--with-colons", "--list-secret-keys", identity],
       options,
     );
-    const lines = listing.stdout.split("\n");
+    const lines = Redacted.value(listing.stdout).split("\n");
     const row = Option.getOrUndefined(Array.findFirst(lines, (line) => line.startsWith("fpr:")));
     const fingerprint = yield* Schema.decodeUnknownEffect(Fingerprint)(row?.split(":")[9]);
     const encrypts = Array.some(
