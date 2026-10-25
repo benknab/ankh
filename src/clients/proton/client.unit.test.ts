@@ -54,7 +54,7 @@ it.effect("folder initialization only creates names missing from a successful li
   }),
 );
 
-it.effect("Proton commands run under the shared state lock", () =>
+it.effect("Proton commands run under the state lock with a pinned environment", () =>
   Effect.gen(function* () {
     const destination = yield* destinationConfig;
     const calls = yield* Ref.make<
@@ -85,7 +85,14 @@ it.effect("Proton commands run under the shared state lock", () =>
       "proton-drive",
       "filesystem",
     ]);
-    expect(call?.options?.env).toMatchObject({ PROTON_DRIVE_CREDENTIALS_STORE: "pass" });
+    expect(call?.options?.env, "inherited variables must not redirect the CLI").toMatchObject({
+      PROTON_DRIVE_BASE_URL: "drive-api.proton.me",
+      PROTON_DRIVE_CREDENTIALS_STORE: "pass",
+      PROTON_DRIVE_UNSAFE_CACHE: "false",
+      PASSWORD_STORE_GPG_OPTS: "",
+      PASSWORD_STORE_KEY: "",
+      PASSWORD_STORE_ENABLE_EXTENSIONS: "false",
+    });
   }),
 );
 
