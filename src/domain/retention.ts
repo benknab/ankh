@@ -1,4 +1,4 @@
-import { DateTime, Effect, HashSet, Option } from "effect";
+import { Array, DateTime, Effect, HashSet, Option, Order } from "effect";
 import { archiveTime } from "#domain/archive.ts";
 import {
   archiveFileName,
@@ -13,60 +13,70 @@ export type Snapshot = {
   readonly time: DateTime.Utc;
 };
 
+const newestFirst = Order.mapInput(
+  Order.flip(DateTime.Order),
+  (snapshot: Snapshot) => snapshot.time,
+);
+
+const parsePair = Effect.fn("parsePair")(function* (
+  job: JobName,
+  names: HashSet.HashSet<string>,
+  entry: string,
+) {
+  const name = entry.endsWith(".sha256") ? entry.slice(0, -".sha256".length) : entry;
+  const time = archiveTime(job, name);
+  if (Option.isNone(time)) {
+    return Option.none<Snapshot>();
+  }
+  if (!HashSet.has(names, name) || !HashSet.has(names, `${name}.sha256`)) {
+    return yield* BackupError.make({ message: `Incomplete remote archive pair: ${name}` });
+  }
+  return entry === name
+    ? Option.some({ name: archiveFileName(name), time: time.value })
+    : Option.none<Snapshot>();
+});
+
 export const parseSnapshotPairs = Effect.fn("parseSnapshotPairs")(function* (
   job: JobName,
   names: HashSet.HashSet<string>,
 ) {
-  const snapshots: Snapshot[] = [];
-  for (const name of names) {
-    if (name.endsWith(".sha256")) {
-      const archive = name.slice(0, -".sha256".length);
-      if (Option.isSome(archiveTime(job, archive)) && !HashSet.has(names, archive)) {
-        return yield* new BackupError({
-          message: `Missing remote archive: ${archive}`,
-        });
-      }
+  const pairs = yield* Effect.forEach(names, (name) => parsePair(job, names, name));
+  return Array.sort(Array.getSomes(pairs), newestFirst);
+});
+
+const keepPeriod = (
+  snapshots: readonly Snapshot[],
+  period: "day" | "week" | "month" | "year",
+  count: number,
+): HashSet.HashSet<ArchiveName> => {
+  let seen = HashSet.empty<string>();
+  let keep = HashSet.empty<ArchiveName>();
+  for (const snapshot of snapshots) {
+    if (HashSet.size(seen) >= count) {
+      break;
     }
-    const time = archiveTime(job, name);
-    if (Option.isSome(time)) {
-      if (!HashSet.has(names, `${name}.sha256`)) {
-        return yield* new BackupError({
-          message: `Missing remote checksum: ${name}`,
-        });
-      }
-      snapshots.push({ name: archiveFileName(name), time: time.value });
+    const key = DateTime.formatIso(DateTime.startOf(snapshot.time, period, { weekStartsOn: 1 }));
+    if (!HashSet.has(seen, key)) {
+      seen = HashSet.add(seen, key);
+      keep = HashSet.add(keep, snapshot.name);
     }
   }
-  return snapshots.sort((a, b) => DateTime.toEpochMillis(b.time) - DateTime.toEpochMillis(a.time));
-});
+  return keep;
+};
 
 export const expiredSnapshots = (
   input: readonly Snapshot[],
   retention: Retention,
 ): HashSet.HashSet<ArchiveName> => {
-  const snapshots = [...input].sort(
-    (a, b) => DateTime.toEpochMillis(b.time) - DateTime.toEpochMillis(a.time),
-  );
-  let keep = HashSet.empty<ArchiveName>();
+  const snapshots = Array.sort(input, newestFirst);
   const periods = [
     ["day", retention.daily],
     ["week", retention.weekly],
     ["month", retention.monthly],
     ["year", retention.yearly],
   ] as const;
-  for (const [period, count] of periods) {
-    let seen = HashSet.empty<string>();
-    for (const snapshot of snapshots) {
-      const key = DateTime.formatIso(DateTime.startOf(snapshot.time, period, { weekStartsOn: 1 }));
-      if (HashSet.has(seen, key)) {
-        continue;
-      }
-      if (HashSet.size(seen) >= count) {
-        break;
-      }
-      seen = HashSet.add(seen, key);
-      keep = HashSet.add(keep, snapshot.name);
-    }
-  }
-  return HashSet.difference(HashSet.fromIterable(snapshots.map((s) => s.name)), keep);
+  const keep = Array.reduce(periods, HashSet.empty<ArchiveName>(), (all, [period, count]) =>
+    HashSet.union(all, keepPeriod(snapshots, period, count)),
+  );
+  return HashSet.difference(HashSet.fromIterable(Array.map(snapshots, (s) => s.name)), keep);
 };

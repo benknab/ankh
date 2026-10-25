@@ -22,8 +22,8 @@ Target files with `pnpm test:unit src/app/scheduler.unit.test.ts` or
 is the inner runner for an already prepared environment. `test:all` runs both
 suites. `bash tools/quickstart.sh` tests the documented production-image flow.
 
-Keep isolated tests in `src/**/*.unit.test.ts` and real process/filesystem tests
-in `src/**/*.integration.test.ts`. Use `it.effect` and TestClock for unit tests,
+Colocate isolated tests in `src/**/*.unit.test.ts` and real process/filesystem tests
+in `src/**/*.integration.test.ts`. Use `expect`, `it.effect`, and TestClock for unit tests,
 and `it.live` for real tools. Use fresh layers when injecting an alternate
 implementation of a service already built in the enclosing test layer.
 

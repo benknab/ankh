@@ -1,4 +1,4 @@
-import { Effect, HashSet, Option, Schema } from "effect";
+import { Array, Effect, HashSet, Option, Schema } from "effect";
 import { ArchiveName, BackupError, type Job, type Proton, RemoteFolder } from "#domain/model.ts";
 import { ProtonDrive } from "#clients/proton/client.ts";
 import { archiveTime } from "#domain/archive.ts";
@@ -12,11 +12,13 @@ const Intent = Schema.fromJsonString(
   }),
 );
 
-export const retainProton = Effect.fn("Proton.retain")(function* (job: Job, destination: Proton) {
-  const { fs, path } = yield* Storage;
+const recover = Effect.fn("Proton.recoverRetention")(function* (
+  job: Job,
+  destination: Proton,
+  journal: string,
+) {
+  const { fs } = yield* Storage;
   const proton = yield* ProtonDrive;
-  yield* privateDirectory(destination.outbox);
-  const journal = path.join(destination.outbox, `.retention-${job.name}.json`);
   // Only an explicit local deletion intent authorizes recovery of an incomplete remote pair.
   if (yield* fs.exists(journal)) {
     const pending = yield* Schema.decodeEffect(Intent, { onExcessProperty: "error" })(
@@ -24,26 +26,43 @@ export const retainProton = Effect.fn("Proton.retain")(function* (job: Job, dest
     );
     if (
       pending.remoteFolder !== destination.remoteFolder ||
-      pending.names.some((name) => Option.isNone(archiveTime(job.name, name)))
+      Array.some(pending.names, (name) => Option.isNone(archiveTime(job.name, name)))
     ) {
-      return yield* new BackupError({
+      return yield* BackupError.make({
         message: "Retention journal belongs to a different job or remote folder",
       });
     }
     yield* proton.trash(destination, HashSet.fromIterable(pending.names));
     yield* fs.remove(journal);
   }
-  const snapshots = yield* parseSnapshotPairs(job.name, yield* proton.list(destination));
-  const expired = expiredSnapshots(snapshots, job.retention);
+});
+
+const removeExpired = Effect.fn("Proton.removeExpired")(function* (
+  destination: Proton,
+  journal: string,
+  expired: HashSet.HashSet<ArchiveName>,
+) {
+  const { fs } = yield* Storage;
+  const proton = yield* ProtonDrive;
   if (HashSet.size(expired) === 0) {
     return;
   }
   const pending = yield* Schema.encodeEffect(Intent)({
     remoteFolder: destination.remoteFolder,
-    names: Array.from(expired),
+    names: Array.fromIterable(expired),
   });
   yield* fs.writeFileString(`${journal}.partial`, pending, { mode: 0o600 });
   yield* fs.rename(`${journal}.partial`, journal);
   yield* proton.trash(destination, expired);
   yield* fs.remove(journal);
+});
+
+export const retainProton = Effect.fn("Proton.retain")(function* (job: Job, destination: Proton) {
+  const { path } = yield* Storage;
+  const proton = yield* ProtonDrive;
+  yield* privateDirectory(destination.outbox);
+  const journal = path.join(destination.outbox, `.retention-${job.name}.json`);
+  yield* recover(job, destination, journal);
+  const snapshots = yield* parseSnapshotPairs(job.name, yield* proton.list(destination));
+  yield* removeExpired(destination, journal, expiredSnapshots(snapshots, job.retention));
 });

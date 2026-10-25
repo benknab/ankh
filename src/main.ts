@@ -1,5 +1,5 @@
 import { NodeRuntime } from "@effect/platform-node";
-import { Console, Effect } from "effect";
+import { Array, Console, Effect, Schema } from "effect";
 import { Argument, Command } from "effect/cli";
 import { Live } from "#app/layers.ts";
 import { AbsolutePath, Actions, BackupError } from "#domain/model.ts";
@@ -21,7 +21,7 @@ const descriptions = {
   "check-read-data": "Read and verify Restic data and check Proton pair names",
 };
 
-const commands = Actions.map((action) =>
+const commands = Array.map(Actions, (action) =>
   Command.make(
     action,
     {
@@ -55,7 +55,7 @@ const cli = Command.make("backup-runner").pipe(
   Command.run({ version: metadata.version }),
   Effect.provide(Live),
   Effect.tapError((error) =>
-    error instanceof BackupError ? Console.error(error.message) : Console.error(String(error)),
+    Schema.is(BackupError)(error) ? Console.error(error.message) : Console.error(String(error)),
   ),
 );
 

@@ -41,6 +41,9 @@ Do not use v3 examples or a separate copy of Effect documentation.
   backup command, Git/LFS, Restic, tar/zstd, GPG/pass, and the official Proton
   CLI remain external tools; do not reimplement their protocols.
 - Use test layers to exercise failures without credentials or production mounts.
+- Use `#` imports for local modules and Vitest `expect` matchers in tests.
+- Put typed tool clients in `src/clients/`. Source and destination adapters
+  implement the contracts in `src/domain/adapters.ts`.
 - Write Effect tests with `it.effect` from `@effect/vitest`; use `it.live` for
   real subprocess and integration tests. Both manage the test scope. Use the
   provided `TestClock` in `it.effect` rather than starting a separate runtime.
@@ -51,7 +54,7 @@ Do not use v3 examples or a separate copy of Effect documentation.
 
 Run `pnpm check` and `pnpm test`. Vite+ runs Oxfmt, Oxlint, and Vitest;
 lint rejects all warnings. TypeScript checks source, tests, and tool config. The official `@effect/tsgo`
-recommended preset runs Effect rules through Oxlint. `prepare` patches only
+presets enable all Effect rules, with documented conflict exceptions in the config. `prepare` patches only
 Oxlint and its type-aware runner; keep TypeScript unpatched. Keep Vite+ settings in
 `vite.config.ts`, including the `fmt` settings for its bundled Oxfmt formatter.
 Run `pnpm fmt <paths>` to format changed files or `pnpm fmt:check <paths>` to check
@@ -60,7 +63,7 @@ files being changed; the generated lockfile is excluded.
 
 ## Tests
 
-- Put isolated tests in `src/**/*.unit.test.ts`. `pnpm test` and `pnpm test:unit`
+- Colocate isolated tests in `src/**/*.unit.test.ts`. `pnpm test` and `pnpm test:unit`
   run only the unit project; additional file filters are accepted.
 - Put tests using real processes, filesystems, databases, or external tools in
   `src/**/*.integration.test.ts`. Do not gate tests with environment variables.

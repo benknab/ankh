@@ -1,4 +1,4 @@
-import { Brand, Cron, HashSet, Result, Schema } from "effect";
+import { Array, Brand, Cron, HashSet, Result, Schema } from "effect";
 
 export class BackupError extends Schema.TaggedError<
   BackupError,
@@ -13,29 +13,29 @@ export class BackupError extends Schema.TaggedError<
 export const backupError =
   (operation: string) =>
   (cause: unknown): BackupError =>
-    cause instanceof BackupError
+    Schema.is(BackupError)(cause)
       ? cause
-      : new BackupError({ message: `${operation} failed`, operation, cause });
+      : BackupError.make({ message: `${operation} failed`, operation, cause });
 
-export const JobName = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]*$/)).pipe(
+export const JobName = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]*$/u)).pipe(
   Schema.brand("JobName"),
 );
 export type JobName = typeof JobName.Type;
 export const AbsolutePath = Schema.String.check(
-  Schema.isPattern(/^\/(?!$)(?!.*(?:^|\/)\.\.?($|\/))(?!.*\/\/)(?!.*\/$)[^\0]+$/),
+  Schema.isPattern(/^\/(?!$)(?!.*(?:^|\/)\.\.?($|\/))(?!.*\/\/)(?!.*\/$)[^\0]+$/u),
 ).pipe(Schema.brand("AbsolutePath"));
 export type AbsolutePath = typeof AbsolutePath.Type;
 export const absolutePath = Brand.nominal<AbsolutePath>();
 export const RemoteFolder = Schema.String.check(
-  Schema.isPattern(/^\/my-files\/(?!.*(?:^|\/)\.\.?($|\/))[^/\\\0]+(?:\/[^/\\\0]+)*$/),
+  Schema.isPattern(/^\/my-files\/(?!.*(?:^|\/)\.\.?($|\/))[^/\\\0]+(?:\/[^/\\\0]+)*$/u),
 ).pipe(Schema.brand("RemoteFolder"));
 export type RemoteFolder = typeof RemoteFolder.Type;
 export const ArchiveName = Schema.String.check(
-  Schema.isPattern(/^[a-z0-9][a-z0-9-]*-\d{8}T\d{9}Z\.tar\.zst$/),
+  Schema.isPattern(/^[a-z0-9][a-z0-9-]*-\d{8}T\d{9}Z\.tar\.zst$/u),
 ).pipe(Schema.brand("ArchiveName"));
 export type ArchiveName = typeof ArchiveName.Type;
 export const archiveFileName = Brand.nominal<ArchiveName>();
-const FileName = Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/));
+const FileName = Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/u));
 const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 
 export const Retention = Schema.Struct({
@@ -57,21 +57,21 @@ export const Gitea = Schema.Struct({
     Schema.makeFilter(
       (url) =>
         (url.protocol === "https:" || url.protocol === "http:") &&
-        !url.username &&
-        !url.password &&
-        !url.search &&
-        !url.hash,
+        url.username === "" &&
+        url.password === "" &&
+        url.search === "" &&
+        url.hash === "",
       { message: "Use an HTTP(S) base URL without credentials, query, or fragment" },
     ),
   ),
   tokenFile: AbsolutePath,
 });
-const PostgresName = Schema.String.check(Schema.isPattern(/^[a-zA-Z_][a-zA-Z0-9_-]*$/)).pipe(
+const PostgresName = Schema.String.check(Schema.isPattern(/^[a-zA-Z_][a-zA-Z0-9_-]*$/u)).pipe(
   Schema.brand("PostgresName"),
 );
 export const Postgres = Schema.Struct({
   type: Schema.Literal("postgres"),
-  hostname: Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9][a-zA-Z0-9.-]*$/)),
+  hostname: Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9][a-zA-Z0-9.-]*$/u)),
   port: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 65535 })),
   database: PostgresName,
   username: PostgresName,
@@ -104,7 +104,7 @@ export const JobSchedule = Schema.Struct({
 export type JobSchedule = typeof JobSchedule.Type;
 export const defaultSchedule: JobSchedule = { cron: "30 3 * * *", timeZone: "UTC" };
 
-const overlaps = (a: string, b: string) =>
+const overlaps = (a: string, b: string): boolean =>
   a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
 
 export const Job = Schema.Struct({
@@ -120,7 +120,7 @@ export const Job = Schema.Struct({
   destinations: Schema.Array(Destination).check(
     Schema.isMinLength(1),
     Schema.makeFilter(
-      (ds) => HashSet.size(HashSet.fromIterable(ds.map((d) => d.type))) === ds.length,
+      (ds) => HashSet.size(HashSet.fromIterable(Array.map(ds, (d) => d.type))) === ds.length,
     ),
   ),
   retention: Retention,
@@ -135,15 +135,21 @@ export const Job = Schema.Struct({
           : job.source.type === "postgres"
             ? job.source.passwordFile
             : job.source.tokenFile,
-        ...job.destinations.flatMap((d) => (d.type === "restic" ? [d.passwordFile] : [])),
+        ...Array.flatMap(job.destinations, (d) => (d.type === "restic" ? [d.passwordFile] : [])),
       ];
-      const outputs = job.destinations.map((d) => (d.type === "restic" ? d.repository : d.outbox));
+      const outputs = Array.map(job.destinations, (d) =>
+        d.type === "restic" ? d.repository : d.outbox,
+      );
       return (
-        [...inputs, ...outputs].every((p) => !overlaps(p, "/staging") && !overlaps(p, "/proton")) &&
-        outputs.every(
+        Array.every(
+          [...inputs, ...outputs],
+          (p) => !overlaps(p, "/staging") && !overlaps(p, "/proton"),
+        ) &&
+        Array.every(
+          outputs,
           (output, index) =>
-            inputs.every((input) => !overlaps(output, input)) &&
-            outputs.slice(index + 1).every((other) => !overlaps(output, other)),
+            Array.every(inputs, (input) => !overlaps(output, input)) &&
+            Array.every(outputs.slice(index + 1), (other) => !overlaps(output, other)),
         )
       );
     },

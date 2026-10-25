@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { type AbsolutePath } from "#domain/model.ts";
+import type { AbsolutePath } from "#domain/model.ts";
 import { privateDirectory, Storage } from "#storage/storage.ts";
 
 export const freshStage = Effect.fn("Sources.freshStage")(function* (directory: AbsolutePath) {

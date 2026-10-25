@@ -1,4 +1,4 @@
-import { Effect, Result } from "effect";
+import { Array, Effect, Result } from "effect";
 import { Destinations } from "#destinations/destinations.ts";
 import {
   type AbsolutePath,
@@ -21,12 +21,13 @@ export const execute = Effect.fn("Runner.execute")(function* (job: Job, action: 
       Effect.result,
     ),
   );
-  const failures = outcomes.filter(Result.isFailure).map((result) => result.failure);
+  const failures = Array.map(Array.filter(outcomes, Result.isFailure), (result) => result.failure);
   if (failures.length > 0) {
-    return yield* new BackupError({
-      message: failures
-        .map(({ destination, error }) => `${destination}: ${error.message}`)
-        .join("; "),
+    return yield* BackupError.make({
+      message: Array.join(
+        Array.map(failures, ({ destination, error }) => `${destination}: ${error.message}`),
+        "; ",
+      ),
       operation: "Destinations",
       cause: failures,
     });

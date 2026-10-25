@@ -1,4 +1,15 @@
-import { Context, Effect, FileSystem, Layer, Path, Ref, Schedule, Schema } from "effect";
+import {
+  Array,
+  Context,
+  Effect,
+  FileSystem,
+  Layer,
+  Path,
+  Record,
+  Ref,
+  Schedule,
+  Schema,
+} from "effect";
 import { type AbsolutePath, BackupError, backupError, type Job, JobJson } from "#domain/model.ts";
 
 export class Storage extends Context.Service<
@@ -7,8 +18,8 @@ export class Storage extends Context.Service<
     readonly fs: FileSystem.FileSystem;
     readonly path: Path.Path;
   }
->()("backup-runner/Storage") {
-  static readonly layer = Layer.effect(
+>()("backup-runner/storage/storage") {
+  public static readonly layer = Layer.effect(
     Storage,
     Effect.gen(function* () {
       return Storage.of({
@@ -24,11 +35,10 @@ export const loadJob = Effect.fn("loadJob")(function* (file: AbsolutePath) {
   return yield* Schema.decodeEffect(JobJson, { onExcessProperty: "error" })(
     yield* fs.readFileString(file),
   ).pipe(
-    Effect.mapError(
-      () =>
-        new BackupError({
-          message: "Invalid job configuration; check the schema and path isolation rules",
-        }),
+    Effect.mapError(() =>
+      BackupError.make({
+        message: "Invalid job configuration; check the schema and path isolation rules",
+      }),
     ),
   );
 });
@@ -36,14 +46,11 @@ export const loadJob = Effect.fn("loadJob")(function* (file: AbsolutePath) {
 export const checkDrive = Effect.fn("checkDrive")(function* (job: Job) {
   const { fs } = yield* Storage;
   const text = yield* fs.readFileString(job.backupDrive.sentinelFile);
-  const fields = Object.fromEntries(
-    text
-      .trim()
-      .split("\n")
-      .map((line) => {
-        const index = line.indexOf("=");
-        return [line.slice(0, index), line.slice(index + 1)];
-      }),
+  const fields = Record.fromEntries(
+    Array.map(text.trim().split("\n"), (line) => {
+      const index = line.indexOf("=");
+      return [line.slice(0, index), line.slice(index + 1)] as const;
+    }),
   );
   yield* Schema.decodeUnknownEffect(
     Schema.Struct({
@@ -77,11 +84,10 @@ export const withLock = Effect.fn("withLock")(function* (job: Job) {
       times: 2160,
       while: (error) => error.reason._tag === "AlreadyExists",
     }),
-    Effect.mapError(
-      () =>
-        new BackupError({
-          message: `Cannot acquire ${directory}; check the drive and any active run or stale lock`,
-        }),
+    Effect.mapError(() =>
+      BackupError.make({
+        message: `Cannot acquire ${directory}; check the drive and any active run or stale lock`,
+      }),
     ),
   );
   return { release };
