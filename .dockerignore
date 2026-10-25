@@ -10,7 +10,8 @@
 !LICENSE
 !THIRD_PARTY_NOTICES.md
 !src/
-!src/**
+!src/**/
+!src/**/*.ts
 !tests/
 !tests/**/*.ts
 !tests/Dockerfile
