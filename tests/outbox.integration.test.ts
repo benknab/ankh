@@ -1,5 +1,5 @@
 import { it } from "@effect/vitest";
-import { DateTime, Effect, Layer, Ref, Result, Schema } from "effect";
+import { DateTime, Effect, Exit, Layer, Ref, Result, Schema } from "effect";
 import { Commands } from "../src/commands.ts";
 import { absolutePath, BackupError, Job, Proton } from "../src/model.ts";
 import { Outbox } from "../src/outbox.ts";
@@ -116,7 +116,7 @@ for (const legacy of [false, true]) {
                 : fs.remove(file, options),
           },
         });
-        const interrupted = Outbox.layer.pipe(
+        const interrupted = Layer.fresh(Outbox.layer).pipe(
           Layer.provide(
             Layer.mergeAll(
               Layer.succeed(Storage, interruptedStorage),
@@ -124,10 +124,11 @@ for (const legacy of [false, true]) {
             ),
           ),
         );
-        yield* Effect.gen(function* () {
+        const exit = yield* Effect.gen(function* () {
           const pending = yield* Outbox;
           yield* pending.drain(job, destination, () => Ref.update(uploads, (n) => n + 1));
         }).pipe(Effect.provide(interrupted), Effect.exit);
+        yield* assert(Exit.isFailure(exit), "injected interruption must occur");
         yield* assert(
           (yield* Ref.get(uploads)) === 1,
           "upload must have completed before interruption",
@@ -175,3 +176,62 @@ it.live("a corrupt ready archive stays on disk while later valid archives upload
     );
   }).pipe(Effect.provide(outboxInfrastructure)),
 );
+
+for (const failure of ["tar", "checksum", "verify", "zstd", "publish", "cleanup"] as const) {
+  it.live(`outbox ${failure} failure never exposes an incomplete archive pair`, () =>
+    Effect.gen(function* () {
+      const storage = yield* Storage;
+      const { fs, path } = storage;
+      const commands = yield* Commands;
+      const root = yield* fs.makeTempDirectoryScoped();
+      const stage = absolutePath(path.join(root, "test-job"));
+      yield* fs.makeDirectory(stage);
+      yield* fs.writeFileString(path.join(stage, "data"), "verified");
+      const destination = yield* Schema.decodeEffect(Proton)({
+        type: "proton-drive",
+        outbox: path.join(root, "outbox"),
+        remoteFolder: "/my-files/a",
+      });
+      const job = yield* Schema.decodeUnknownEffect(Job)(fixture);
+      const failedCommands = Commands.of({
+        run: (binary, args, options) =>
+          (binary === "tar" && (failure === "tar" || failure === "cleanup")) ||
+          (binary === "zstd" && failure === "zstd") ||
+          (binary === "sha256sum" &&
+            (args[0] === "--check" ? failure === "verify" : failure === "checksum"))
+            ? Effect.fail(new BackupError({ message: "injected failure" }))
+            : commands.run(binary, args, options),
+      });
+      const failedStorage = Storage.of({
+        ...storage,
+        fs: {
+          ...fs,
+          rename: (from, to) =>
+            failure === "publish" ? fs.rename("/missing-test-source", to) : fs.rename(from, to),
+          remove: (file, options) =>
+            failure === "cleanup" && path.basename(file).startsWith(".partial-")
+              ? fs.remove("/missing-test-source")
+              : fs.remove(file, options),
+        },
+      });
+      const layer = Layer.fresh(Outbox.layer).pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.succeed(Storage, failedStorage),
+            Layer.succeed(Commands, failedCommands),
+          ),
+        ),
+      );
+      const result = yield* Effect.gen(function* () {
+        yield* (yield* Outbox).enqueue(job, destination, stage);
+      }).pipe(Effect.provide(layer), Effect.result);
+      yield* assert(Result.isFailure(result), "failure must stay in the Effect error channel");
+      yield* assert(
+        (yield* fs.readDirectory(destination.outbox)).every((entry) =>
+          entry.startsWith(".partial-"),
+        ),
+        "failed publication must not expose ready data",
+      );
+    }).pipe(Effect.provide(outboxInfrastructure)),
+  );
+}
