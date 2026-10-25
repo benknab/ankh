@@ -78,6 +78,22 @@ it.live("command output stays exact and hidden even for unknown secrets and spaw
   }).pipe(Effect.provide(infrastructure)),
 );
 
+it.live("capture overflow drains both pipes before rejecting the command", () =>
+  Effect.gen(function* () {
+    const commands = yield* Commands;
+    const result = yield* commands
+      .run(process.execPath, [
+        "--eval",
+        'process.stdout.write("x".repeat(17 * 1024 * 1024)); process.stderr.write("y".repeat(1024 * 1024))',
+      ])
+      .pipe(Effect.result);
+    expect(Result.isFailure(result)).toBe(true);
+    if (Result.isFailure(result)) {
+      expect(result.failure.message).toBe(`${process.execPath} output exceeded the capture limit`);
+    }
+  }).pipe(Effect.provide(infrastructure)),
+);
+
 it.live("an explicit command environment excludes every inherited variable", () =>
   Effect.gen(function* () {
     const commands = yield* Commands;
