@@ -1,19 +1,16 @@
-import { Effect, Record } from "effect";
-import { Commands } from "#process/commands.ts";
+import { Effect } from "effect";
+import { runProton } from "#clients/proton/command.ts";
 import { ensureKey } from "#clients/proton/credentials.ts";
-import { protonEnvironment, protonPaths } from "#clients/proton/state.ts";
+import { ProtonState } from "#clients/proton/state.ts";
 import { privateDirectory, Storage } from "#storage/storage.ts";
 
 export const login = Effect.fn("Proton.login")(function* () {
-  const commands = yield* Commands;
   const { fs } = yield* Storage;
-  yield* Effect.forEach(Record.values(protonPaths), privateDirectory, { discard: true });
+  const { gnupg, passwordStore, cache } = yield* ProtonState;
+  yield* Effect.forEach([gnupg, passwordStore, cache], privateDirectory, { discard: true });
   const fingerprint = yield* ensureKey();
-  if (!(yield* fs.exists(`${protonPaths.passwordStore}/.gpg-id`))) {
-    yield* commands.run("pass", ["init", fingerprint], { env: protonEnvironment });
+  if (!(yield* fs.exists(`${passwordStore}/.gpg-id`))) {
+    yield* runProton("pass", ["init", fingerprint]);
   }
-  yield* commands.run("proton-drive", ["auth", "login"], {
-    env: protonEnvironment,
-    interactive: true,
-  });
+  yield* runProton("proton-drive", ["auth", "login"], { interactive: true });
 });

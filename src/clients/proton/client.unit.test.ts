@@ -1,6 +1,6 @@
 import { expect, it } from "@effect/vitest";
 import { Array, DateTime, Effect, HashSet, Layer, Ref, Result, Schema } from "effect";
-import { type Argument, Commands } from "#process/commands.ts";
+import { type Argument, Commands, type Options } from "#process/commands.ts";
 import { absolutePath, BackupError, JobName, Proton } from "#domain/model.ts";
 import { ProtonDrive } from "#clients/proton/client.ts";
 import { archiveName } from "#domain/archive.ts";
@@ -51,6 +51,41 @@ it.effect("folder initialization only creates names missing from a successful li
       Result.isFailure(result) && result.failure === failure,
       "authentication error must be preserved",
     ).toBe(true);
+  }),
+);
+
+it.effect("Proton commands run under the shared state lock", () =>
+  Effect.gen(function* () {
+    const destination = yield* destinationConfig;
+    const calls = yield* Ref.make<
+      readonly { binary: string; args: readonly Argument[]; options?: Options }[]
+    >([]);
+    const commands = Commands.of({
+      run: (binary, args, options) =>
+        Ref.update(calls, (all) => [
+          ...all,
+          { binary, args, ...(options === undefined ? {} : { options }) },
+        ]).pipe(Effect.as(output("[]"))),
+    });
+    yield* Effect.gen(function* () {
+      yield* (yield* ProtonDrive).list(destination);
+    }).pipe(
+      Effect.provide(ProtonDrive.layer.pipe(Layer.provide(Layer.succeed(Commands, commands)))),
+    );
+    const [call] = yield* Ref.get(calls);
+    expect(call?.binary, "every Proton tool must run through flock").toBe("flock");
+    expect(call?.args.slice(0, 9)).toEqual([
+      "--exclusive",
+      "--close",
+      "--timeout",
+      "21600",
+      "--conflict-exit-code",
+      "75",
+      "/proton/lock",
+      "proton-drive",
+      "filesystem",
+    ]);
+    expect(call?.options?.env).toMatchObject({ PROTON_DRIVE_CREDENTIALS_STORE: "pass" });
   }),
 );
 

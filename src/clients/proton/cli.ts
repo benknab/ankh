@@ -1,7 +1,7 @@
 import { Array, Context, Effect, HashSet, Layer, Redacted, Schema } from "effect";
 import { backupError, type BackupError } from "#domain/model.ts";
 import { Commands } from "#process/commands.ts";
-import { protonEnvironment } from "#clients/proton/state.ts";
+import { runProton } from "#clients/proton/command.ts";
 
 const Name = Schema.Struct({ ok: Schema.Literal(true), value: Schema.NonEmptyString });
 const Files = Schema.fromJsonString(
@@ -26,9 +26,9 @@ export class ProtonCli extends Context.Service<
   public static readonly layer = Layer.effect(
     ProtonCli,
     Effect.gen(function* () {
-      const commands = yield* Commands;
+      const context = (yield* Effect.context<Commands>()).pipe(Context.pick(Commands));
       const run = Effect.fn("ProtonCli.run")((args: readonly string[]) =>
-        commands.run("proton-drive", ["filesystem", ...args], { env: protonEnvironment }),
+        runProton("proton-drive", ["filesystem", ...args]).pipe(Effect.provide(context)),
       );
       const list = Effect.fn("ProtonCli.list")(
         function* (folder: string, type: "file" | "folder") {
