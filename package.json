@@ -14,8 +14,8 @@
   },
   "type": "module",
   "imports": {
-    "#package": "./package.json",
-    "#*": "./src/*"
+    "#/package": "./package.json",
+    "#/*": "./src/*"
   },
   "scripts": {
     "start": "node src/main.ts",

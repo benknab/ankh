@@ -1,9 +1,9 @@
 import { expect, it } from "@effect/vitest";
 import { Array, DateTime, Effect, HashSet, Result, Schema } from "effect";
-import { JobName } from "#domain/model.ts";
-import { archiveName } from "#domain/archive.ts";
+import { JobName } from "#/domain/model.ts";
+import { archiveName } from "#/domain/archive.ts";
 import { TestClock } from "effect/testing";
-import { expiredSnapshots, parseSnapshotPairs, retentionCandidates } from "#domain/retention.ts";
+import { expiredSnapshots, parseSnapshotPairs, retentionCandidates } from "#/domain/retention.ts";
 
 it.effect("retention consumes parsed snapshots and keeps newest per UTC period", () =>
   Effect.gen(function* () {

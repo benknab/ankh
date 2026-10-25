@@ -1,9 +1,9 @@
 import { expect, it } from "@effect/vitest";
 import { Effect, Layer, Ref, Result } from "effect";
-import { SqliteClient } from "#clients/sqlite.ts";
-import { absolutePath } from "#domain/model.ts";
-import { Commands } from "#process/commands.ts";
-import { output } from "#testing/commands.ts";
+import { SqliteClient } from "#/clients/sqlite.ts";
+import { absolutePath } from "#/domain/model.ts";
+import { Commands } from "#/process/commands.ts";
+import { output } from "#/testing/commands.ts";
 
 it.effect("SQLite rejects a successful process with a failed integrity check", () =>
   Effect.gen(function* () {

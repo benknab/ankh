@@ -1,11 +1,11 @@
 import { Context, Effect, Layer } from "effect";
-import type { BackupError, Destination, DestinationRequest, Job } from "#domain/model.ts";
-import { Outbox } from "#outbox/outbox.ts";
-import { ProtonDrive } from "#clients/proton/client.ts";
-import { ResticClient } from "#clients/restic.ts";
-import { protonAdapter } from "#destinations/proton.ts";
-import { resticAdapter } from "#destinations/restic.ts";
-import { Storage } from "#storage/storage.ts";
+import type { BackupError, Destination, DestinationRequest, Job } from "#/domain/model.ts";
+import { Outbox } from "#/outbox/outbox.ts";
+import { ProtonDrive } from "#/clients/proton/client.ts";
+import { ResticClient } from "#/clients/restic.ts";
+import { protonAdapter } from "#/destinations/proton.ts";
+import { resticAdapter } from "#/destinations/restic.ts";
+import { Storage } from "#/storage/storage.ts";
 
 export class Destinations extends Context.Service<
   Destinations,

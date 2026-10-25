@@ -1,12 +1,12 @@
 import { expect, it } from "@effect/vitest";
 import { Effect, Layer, Redacted, Result, Schema } from "effect";
 import { FetchHttpClient } from "effect/http";
-import { Commands } from "#process/commands.ts";
-import { Job } from "#domain/model.ts";
-import { Sources } from "#sources/sources.ts";
-import { Storage } from "#storage/storage.ts";
-import { infrastructure } from "#testing/infrastructure.ts";
-import { fixture } from "#testing/fixtures.ts";
+import { Commands } from "#/process/commands.ts";
+import { Job } from "#/domain/model.ts";
+import { Sources } from "#/sources/sources.ts";
+import { Storage } from "#/storage/storage.ts";
+import { infrastructure } from "#/testing/infrastructure.ts";
+import { fixture } from "#/testing/fixtures.ts";
 
 it.live("PostgreSQL source dumps and restores data, and rejects bad credentials", () =>
   Effect.gen(function* () {

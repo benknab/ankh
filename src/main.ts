@@ -1,13 +1,13 @@
 import { NodeRuntime } from "@effect/platform-node";
 import { Array, Effect } from "effect";
 import { Argument, Command } from "effect/cli";
-import { Live } from "#app/layers.ts";
-import { AbsolutePath, Actions } from "#domain/model.ts";
-import { runJob, validate } from "#app/runner.ts";
-import { login } from "#clients/proton/auth.ts";
-import { serve } from "#app/scheduler.ts";
-import metadata from "#package" with { type: "json" };
-import { withExecution } from "#telemetry/execution.ts";
+import { Live } from "#/app/layers.ts";
+import { AbsolutePath, Actions } from "#/domain/model.ts";
+import { runJob, validate } from "#/app/runner.ts";
+import { login } from "#/clients/proton/auth.ts";
+import { serve } from "#/app/scheduler.ts";
+import metadata from "#/package" with { type: "json" };
+import { withExecution } from "#/telemetry/execution.ts";
 
 const jobArgument = Argument.String("job-file").pipe(
   Argument.withDefault("/job/backup.job.json"),

@@ -1,8 +1,8 @@
 import { Context, Effect, Layer, Redacted, Schema } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
-import { backupError, type BackupError, type Gitea } from "#domain/model.ts";
-import { Storage } from "#storage/storage.ts";
-import { readSecret } from "#storage/secrets.ts";
+import { backupError, type BackupError, type Gitea } from "#/domain/model.ts";
+import { Storage } from "#/storage/storage.ts";
+import { readSecret } from "#/storage/secrets.ts";
 
 const Repository = Schema.Struct({
   full_name: Schema.String.check(

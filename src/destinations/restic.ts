@@ -1,7 +1,7 @@
 import { Effect } from "effect";
-import { ResticClient } from "#clients/restic.ts";
-import type { DestinationAdapter } from "#domain/adapters.ts";
-import type { DestinationRequest, Job, Restic } from "#domain/model.ts";
+import { ResticClient } from "#/clients/restic.ts";
+import type { DestinationAdapter } from "#/domain/adapters.ts";
+import type { DestinationRequest, Job, Restic } from "#/domain/model.ts";
 
 export const resticAdapter: DestinationAdapter<Restic, ResticClient> = {
   run: Effect.fn("Restic.run")(function* (

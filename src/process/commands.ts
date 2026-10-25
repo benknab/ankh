@@ -1,10 +1,10 @@
 import { Array, Context, Effect, Layer, Record, Redacted } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
-import { BackupError, backupError } from "#domain/model.ts";
-import { capture, type Argument, type CommandOutput, type Options } from "#process/output.ts";
-import { track } from "#telemetry/execution.ts";
+import { BackupError, backupError } from "#/domain/model.ts";
+import { capture, type Argument, type CommandOutput, type Options } from "#/process/output.ts";
+import { track } from "#/telemetry/execution.ts";
 
-export type { Argument, CommandOutput, Options } from "#process/output.ts";
+export type { Argument, CommandOutput, Options } from "#/process/output.ts";
 
 const reveal = (value: Argument): string =>
   Redacted.isRedacted(value) ? Redacted.value(value) : value;

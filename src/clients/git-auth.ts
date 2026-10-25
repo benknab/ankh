@@ -1,6 +1,6 @@
 import { Option, Schema } from "effect";
-import type { GitRepository } from "#clients/git.ts";
-import type { Options } from "#process/commands.ts";
+import type { GitRepository } from "#/clients/git.ts";
+import type { Options } from "#/process/commands.ts";
 
 export const gitOptions = (repository: GitRepository): Options => {
   const url = Schema.decodeOption(Schema.URLFromString)(repository.url).pipe(

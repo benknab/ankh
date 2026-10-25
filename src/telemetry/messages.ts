@@ -12,8 +12,8 @@ import {
   References,
   type Schema,
 } from "effect";
-import { fields, isFields, value } from "#telemetry/values.ts";
-import { type Completion, failure } from "#telemetry/event.ts";
+import { fields, isFields, value } from "#/telemetry/values.ts";
+import { type Completion, failure } from "#/telemetry/event.ts";
 
 export interface Message {
   readonly level: LogLevel.LogLevel;

@@ -1,9 +1,9 @@
 import { Array, Effect, Option } from "effect";
-import { BackupError, backupError } from "#domain/model.ts";
-import { runProton } from "#clients/proton/command.ts";
-import { checkKey, ensureKey, requireKey } from "#clients/proton/keys.ts";
-import { type KeyProtection, keyProtection, ProtonState } from "#clients/proton/state.ts";
-import { Storage } from "#storage/storage.ts";
+import { BackupError, backupError } from "#/domain/model.ts";
+import { runProton } from "#/clients/proton/command.ts";
+import { checkKey, ensureKey, requireKey } from "#/clients/proton/keys.ts";
+import { type KeyProtection, keyProtection, ProtonState } from "#/clients/proton/state.ts";
+import { Storage } from "#/storage/storage.ts";
 
 // The CLI stores its session in this folder, and pass encrypts each entry to the nearest .gpg-id.
 const sessionFolders = ["ch.proton.drive", "ch.proton.drive/drive-sdk-cli"] as const;

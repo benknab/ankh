@@ -1,8 +1,8 @@
 import { expect, it } from "@effect/vitest";
 import { Effect, FileSystem, Layer, Path, Redacted, Result, Schema } from "effect";
-import { absolutePath, backupError } from "#domain/model.ts";
-import { readSecret, Secret } from "#storage/secrets.ts";
-import { Storage } from "#storage/storage.ts";
+import { absolutePath, backupError } from "#/domain/model.ts";
+import { readSecret, Secret } from "#/storage/secrets.ts";
+import { Storage } from "#/storage/storage.ts";
 
 it.effect("secret reads preserve password whitespace and hide invalid input", () =>
   Effect.gen(function* () {

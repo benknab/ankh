@@ -1,11 +1,11 @@
 import { expect, it } from "@effect/vitest";
 import { Effect, Redacted, Result, Schema } from "effect";
-import { Commands } from "#process/commands.ts";
-import { Actions, BackupError, Job } from "#domain/model.ts";
-import { Storage, withLock } from "#storage/storage.ts";
-import { infrastructure } from "#testing/infrastructure.ts";
-import { fixture } from "#testing/fixtures.ts";
-import metadata from "#package" with { type: "json" };
+import { Commands } from "#/process/commands.ts";
+import { Actions, BackupError, Job } from "#/domain/model.ts";
+import { Storage, withLock } from "#/storage/storage.ts";
+import { infrastructure } from "#/testing/infrastructure.ts";
+import { fixture } from "#/testing/fixtures.ts";
+import metadata from "#/package" with { type: "json" };
 
 it.live("Node runs the TypeScript CLI and rejects unsafe job paths", () =>
   Effect.gen(function* () {

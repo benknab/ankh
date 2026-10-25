@@ -1,19 +1,19 @@
 import { expect, it } from "@effect/vitest";
 import { Duration, Effect, Fiber, Redacted, Ref, Result } from "effect";
-import { login } from "#clients/proton/auth.ts";
-import { runProton } from "#clients/proton/command.ts";
-import { verifyCredentials } from "#clients/proton/credentials.ts";
+import { login } from "#/clients/proton/auth.ts";
+import { runProton } from "#/clients/proton/command.ts";
+import { verifyCredentials } from "#/clients/proton/credentials.ts";
 import {
   passphraseArguments,
   type ProtonPaths,
   ProtonState,
   protonEnvironment,
-} from "#clients/proton/state.ts";
-import { absolutePath, type BackupError } from "#domain/model.ts";
-import { Commands, type Options } from "#process/commands.ts";
-import { Storage } from "#storage/storage.ts";
-import { infrastructure } from "#testing/infrastructure.ts";
-import { output } from "#testing/commands.ts";
+} from "#/clients/proton/state.ts";
+import { absolutePath, type BackupError } from "#/domain/model.ts";
+import { Commands, type Options } from "#/process/commands.ts";
+import { Storage } from "#/storage/storage.ts";
+import { infrastructure } from "#/testing/infrastructure.ts";
+import { output } from "#/testing/commands.ts";
 
 // Each scenario gets private GnuPG and pass state, and stops its agent afterwards.
 const isolated = Effect.fn("Test.isolatedProtonState")(function* () {

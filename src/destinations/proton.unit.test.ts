@@ -1,12 +1,12 @@
 import { expect, it } from "@effect/vitest";
 import { Effect, FileSystem, Layer, Logger, Path, Ref, Schema } from "effect";
-import { ProtonDrive } from "#clients/proton/client.ts";
-import { protonAdapter } from "#destinations/proton.ts";
-import { absolutePath, BackupError, Job, Proton } from "#domain/model.ts";
-import { Outbox } from "#outbox/outbox.ts";
-import { Storage } from "#storage/storage.ts";
-import { withExecution } from "#telemetry/execution.ts";
-import { fixture } from "#testing/fixtures.ts";
+import { ProtonDrive } from "#/clients/proton/client.ts";
+import { protonAdapter } from "#/destinations/proton.ts";
+import { absolutePath, BackupError, Job, Proton } from "#/domain/model.ts";
+import { Outbox } from "#/outbox/outbox.ts";
+import { Storage } from "#/storage/storage.ts";
+import { withExecution } from "#/telemetry/execution.ts";
+import { fixture } from "#/testing/fixtures.ts";
 
 it.effect("Proton credential failures keep the archive and report a fixed reason", () =>
   Effect.gen(function* () {

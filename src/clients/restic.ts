@@ -5,10 +5,10 @@ import {
   type BackupError,
   type Restic,
   type Retention,
-} from "#domain/model.ts";
-import { Commands } from "#process/commands.ts";
-import { Storage } from "#storage/storage.ts";
-import { readSecret } from "#storage/secrets.ts";
+} from "#/domain/model.ts";
+import { Commands } from "#/process/commands.ts";
+import { Storage } from "#/storage/storage.ts";
+import { readSecret } from "#/storage/secrets.ts";
 
 interface SnapshotRequest {
   readonly stage: AbsolutePath;

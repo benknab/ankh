@@ -1,7 +1,7 @@
 import { Array, Context, Effect, HashSet, Layer } from "effect";
-import { type ArchiveName, BackupError, type Proton } from "#domain/model.ts";
-import type { Archive } from "#domain/archive.ts";
-import { ProtonCli } from "#clients/proton/cli.ts";
+import { type ArchiveName, BackupError, type Proton } from "#/domain/model.ts";
+import type { Archive } from "#/domain/archive.ts";
+import { ProtonCli } from "#/clients/proton/cli.ts";
 
 type Folder = Pick<Proton, "remoteFolder">;
 

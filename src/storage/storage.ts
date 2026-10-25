@@ -17,7 +17,7 @@ import {
   driveLockPath,
   type Job,
   JobJson,
-} from "#domain/model.ts";
+} from "#/domain/model.ts";
 
 export class Storage extends Context.Service<
   Storage,

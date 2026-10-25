@@ -12,9 +12,9 @@ import {
   Schema,
 } from "effect";
 import { TestClock } from "effect/testing";
-import { BackupError, Job } from "#domain/model.ts";
-import { describeJob, track, withExecution } from "#telemetry/execution.ts";
-import { fixture } from "#testing/fixtures.ts";
+import { BackupError, Job } from "#/domain/model.ts";
+import { describeJob, track, withExecution } from "#/telemetry/execution.ts";
+import { fixture } from "#/testing/fixtures.ts";
 
 const Event = Schema.Struct({
   event: Schema.String,

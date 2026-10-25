@@ -12,16 +12,16 @@ import {
   Schema,
 } from "effect";
 import { FetchHttpClient } from "effect/http";
-import { Commands } from "#process/commands.ts";
-import { Destinations } from "#destinations/destinations.ts";
-import { absolutePath, BackupError, Job } from "#domain/model.ts";
-import { Outbox } from "#outbox/outbox.ts";
-import { ProtonDrive } from "#clients/proton/client.ts";
-import { runJob } from "#app/runner.ts";
-import { Sources } from "#sources/sources.ts";
-import { Storage } from "#storage/storage.ts";
-import { outboxInfrastructure } from "#testing/infrastructure.ts";
-import { fixture } from "#testing/fixtures.ts";
+import { Commands } from "#/process/commands.ts";
+import { Destinations } from "#/destinations/destinations.ts";
+import { absolutePath, BackupError, Job } from "#/domain/model.ts";
+import { Outbox } from "#/outbox/outbox.ts";
+import { ProtonDrive } from "#/clients/proton/client.ts";
+import { runJob } from "#/app/runner.ts";
+import { Sources } from "#/sources/sources.ts";
+import { Storage } from "#/storage/storage.ts";
+import { outboxInfrastructure } from "#/testing/infrastructure.ts";
+import { fixture } from "#/testing/fixtures.ts";
 
 it.live("real SQLite and Restic survive Proton failure, then retry and restore both copies", () =>
   Effect.gen(function* () {

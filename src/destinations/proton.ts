@@ -1,18 +1,18 @@
 import { Effect } from "effect";
-import type { DestinationAdapter } from "#domain/adapters.ts";
+import type { DestinationAdapter } from "#/domain/adapters.ts";
 import {
   BackupError,
   backupError,
   type DestinationRequest,
   type Job,
   type Proton,
-} from "#domain/model.ts";
-import { Outbox } from "#outbox/outbox.ts";
-import { ProtonDrive } from "#clients/proton/client.ts";
-import { retainProton } from "#destinations/proton-retention.ts";
-import { parseSnapshotPairs } from "#domain/retention.ts";
-import type { Storage } from "#storage/storage.ts";
-import { track } from "#telemetry/execution.ts";
+} from "#/domain/model.ts";
+import { Outbox } from "#/outbox/outbox.ts";
+import { ProtonDrive } from "#/clients/proton/client.ts";
+import { retainProton } from "#/destinations/proton-retention.ts";
+import { parseSnapshotPairs } from "#/domain/retention.ts";
+import type { Storage } from "#/storage/storage.ts";
+import { track } from "#/telemetry/execution.ts";
 
 const check = Effect.fn("Proton.check")(function* (job: Job, destination: Proton) {
   const outbox = yield* Outbox;

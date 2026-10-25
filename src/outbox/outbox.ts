@@ -1,17 +1,17 @@
 import { type Cause, Context, Effect, Layer, Queue, Redacted, Result, Stream } from "effect";
-import { ArchiveClient } from "#clients/archive.ts";
-import type { Archive } from "#domain/archive.ts";
+import { ArchiveClient } from "#/clients/archive.ts";
+import type { Archive } from "#/domain/archive.ts";
 import {
   type AbsolutePath,
   BackupError,
   backupError,
   type Job,
   type Proton,
-} from "#domain/model.ts";
-import { acknowledge, list } from "#outbox/files.ts";
-import { enqueue } from "#outbox/publish.ts";
-import { Storage } from "#storage/storage.ts";
-import { track } from "#telemetry/execution.ts";
+} from "#/domain/model.ts";
+import { acknowledge, list } from "#/outbox/files.ts";
+import { enqueue } from "#/outbox/publish.ts";
+import { Storage } from "#/storage/storage.ts";
+import { track } from "#/telemetry/execution.ts";
 
 const deliver = Effect.fn("Outbox.deliver")(function* (
   archive: Archive,

@@ -5,7 +5,7 @@ import type {
   Destination,
   DestinationRequest,
   Job,
-} from "#domain/model.ts";
+} from "#/domain/model.ts";
 
 export interface SourceAdapter<C, R> {
   readonly stage: (

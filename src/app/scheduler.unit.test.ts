@@ -12,11 +12,11 @@ import {
   Schema,
 } from "effect";
 import { TestClock } from "effect/testing";
-import { absolutePath, BackupError } from "#domain/model.ts";
-import { scheduledAttempts, serve } from "#app/scheduler.ts";
-import { Storage } from "#storage/storage.ts";
-import { Sources } from "#sources/sources.ts";
-import { Destinations } from "#destinations/destinations.ts";
+import { absolutePath, BackupError } from "#/domain/model.ts";
+import { scheduledAttempts, serve } from "#/app/scheduler.ts";
+import { Storage } from "#/storage/storage.ts";
+import { Sources } from "#/sources/sources.ts";
+import { Destinations } from "#/destinations/destinations.ts";
 
 for (const [season, utcHour] of [
   ["2026-09-20", "04"],

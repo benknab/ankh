@@ -1,12 +1,12 @@
 import { Array, DateTime, Effect, HashSet, Option, Order } from "effect";
-import { archiveTime } from "#domain/archive.ts";
+import { archiveTime } from "#/domain/archive.ts";
 import {
   archiveFileName,
   type ArchiveName,
   BackupError,
   type JobName,
   type Retention,
-} from "#domain/model.ts";
+} from "#/domain/model.ts";
 
 export type Snapshot = {
   readonly name: ArchiveName;

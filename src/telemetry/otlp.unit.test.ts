@@ -11,8 +11,8 @@ import {
   Schema,
 } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
-import { withExecution } from "#telemetry/execution.ts";
-import { Otlp } from "#telemetry/otlp.ts";
+import { withExecution } from "#/telemetry/execution.ts";
+import { Otlp } from "#/telemetry/otlp.ts";
 
 const settings = {
   OTEL_EXPORTER_OTLP_ENDPOINT: "http://collector:4318",

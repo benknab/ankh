@@ -3,12 +3,12 @@ import { expect, it } from "@effect/vitest";
 import { Context, Effect, Layer, Redacted, Ref, Result } from "effect";
 import { Base64 } from "effect/encoding";
 import { HttpServer, HttpServerRequest, HttpServerResponse } from "effect/http";
-import { GitClient } from "#clients/git.ts";
-import { gitOptions } from "#clients/git-auth.ts";
-import { absolutePath } from "#domain/model.ts";
-import { Commands } from "#process/commands.ts";
-import { Storage } from "#storage/storage.ts";
-import { infrastructure } from "#testing/infrastructure.ts";
+import { GitClient } from "#/clients/git.ts";
+import { gitOptions } from "#/clients/git-auth.ts";
+import { absolutePath } from "#/domain/model.ts";
+import { Commands } from "#/process/commands.ts";
+import { Storage } from "#/storage/storage.ts";
+import { infrastructure } from "#/testing/infrastructure.ts";
 
 const server = Effect.fn("Test.server")(function* (
   app: Effect.Effect<

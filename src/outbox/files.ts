@@ -1,7 +1,7 @@
 import { Array, Effect, Option, String } from "effect";
-import { type Archive, archiveTime } from "#domain/archive.ts";
-import { absolutePath, archiveFileName, type Job, type Proton } from "#domain/model.ts";
-import { privateDirectory, Storage } from "#storage/storage.ts";
+import { type Archive, archiveTime } from "#/domain/archive.ts";
+import { absolutePath, archiveFileName, type Job, type Proton } from "#/domain/model.ts";
+import { privateDirectory, Storage } from "#/storage/storage.ts";
 
 const retire = Effect.fn("Outbox.retire")(function* (job: Job, destination: Proton, entry: string) {
   const { fs, path } = yield* Storage;

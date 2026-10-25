@@ -11,12 +11,12 @@ import {
   Result,
   Schema,
 } from "effect";
-import { Commands } from "#process/commands.ts";
-import { absolutePath, BackupError, Job, Proton } from "#domain/model.ts";
-import { Outbox } from "#outbox/outbox.ts";
-import { Storage } from "#storage/storage.ts";
-import { outboxInfrastructure } from "#testing/infrastructure.ts";
-import { fixture } from "#testing/fixtures.ts";
+import { Commands } from "#/process/commands.ts";
+import { absolutePath, BackupError, Job, Proton } from "#/domain/model.ts";
+import { Outbox } from "#/outbox/outbox.ts";
+import { Storage } from "#/storage/storage.ts";
+import { outboxInfrastructure } from "#/testing/infrastructure.ts";
+import { fixture } from "#/testing/fixtures.ts";
 
 it.live("durable outbox survives failure, retries through Queue, and restores SQLite", () =>
   Effect.gen(function* () {

@@ -1,9 +1,9 @@
 import { Array, Context, Effect, HashSet, Layer, Redacted, Schema } from "effect";
-import { backupError, BackupError } from "#domain/model.ts";
-import { Commands } from "#process/commands.ts";
-import { runProton } from "#clients/proton/command.ts";
-import { verifyCredentials } from "#clients/proton/credentials.ts";
-import { Storage } from "#storage/storage.ts";
+import { backupError, BackupError } from "#/domain/model.ts";
+import { Commands } from "#/process/commands.ts";
+import { runProton } from "#/clients/proton/command.ts";
+import { verifyCredentials } from "#/clients/proton/credentials.ts";
+import { Storage } from "#/storage/storage.ts";
 
 const Name = Schema.Struct({ ok: Schema.Literal(true), value: Schema.NonEmptyString });
 const Files = Schema.fromJsonString(

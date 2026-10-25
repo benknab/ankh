@@ -1,6 +1,6 @@
 import { expect, it } from "@effect/vitest";
 import { Array, Cause, Effect, Fiber, Logger, Record, Redacted, References, Schema } from "effect";
-import { track, withExecution } from "#telemetry/execution.ts";
+import { track, withExecution } from "#/telemetry/execution.ts";
 
 const Event = Schema.Struct({
   operation: Schema.String,

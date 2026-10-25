@@ -116,7 +116,7 @@ export default defineConfig({
       // Effect Array functions take callbacks where native methods take thisArg.
       "unicorn/no-array-method-this-argument": "off",
 
-      // Imports and exports: named exports, explicit type imports, and # paths.
+      // Imports and exports: named exports, explicit type imports, and #/ paths.
       "typescript/consistent-type-imports": "error",
       "typescript/consistent-type-exports": "error",
       "effecttsgo/prefer-namespace-import": "off",

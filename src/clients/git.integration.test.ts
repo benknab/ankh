@@ -1,10 +1,10 @@
 import { expect, it } from "@effect/vitest";
 import { Effect, Layer, Redacted } from "effect";
-import { GitClient } from "#clients/git.ts";
-import { absolutePath } from "#domain/model.ts";
-import { Commands } from "#process/commands.ts";
-import { Storage } from "#storage/storage.ts";
-import { infrastructure } from "#testing/infrastructure.ts";
+import { GitClient } from "#/clients/git.ts";
+import { absolutePath } from "#/domain/model.ts";
+import { Commands } from "#/process/commands.ts";
+import { Storage } from "#/storage/storage.ts";
+import { infrastructure } from "#/testing/infrastructure.ts";
 
 it.live("an existing mirror switches to the requested origin", () =>
   Effect.gen(function* () {

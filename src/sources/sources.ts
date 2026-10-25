@@ -1,19 +1,19 @@
 import { Context, Effect, Layer } from "effect";
-import { SqliteClient } from "#clients/sqlite.ts";
-import { PostgresClient } from "#clients/postgres.ts";
-import { GiteaClient } from "#clients/gitea.ts";
-import { GitClient } from "#clients/git.ts";
+import { SqliteClient } from "#/clients/sqlite.ts";
+import { PostgresClient } from "#/clients/postgres.ts";
+import { GiteaClient } from "#/clients/gitea.ts";
+import { GitClient } from "#/clients/git.ts";
 import {
   type AbsolutePath,
   absolutePath,
   type BackupError,
   backupError,
   type Job,
-} from "#domain/model.ts";
-import { gitAdapter } from "#sources/gitea.ts";
-import { postgresAdapter } from "#sources/postgres.ts";
-import { sqliteAdapter } from "#sources/sqlite.ts";
-import { Storage } from "#storage/storage.ts";
+} from "#/domain/model.ts";
+import { gitAdapter } from "#/sources/gitea.ts";
+import { postgresAdapter } from "#/sources/postgres.ts";
+import { sqliteAdapter } from "#/sources/sqlite.ts";
+import { Storage } from "#/storage/storage.ts";
 
 const stage = Effect.fn("Sources.stage")(
   function* (job: Job) {

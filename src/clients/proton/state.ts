@@ -5,8 +5,8 @@ import {
   BackupError,
   backupError,
   protonPassphraseFile,
-} from "#domain/model.ts";
-import { Storage } from "#storage/storage.ts";
+} from "#/domain/model.ts";
+import { Storage } from "#/storage/storage.ts";
 
 export interface ProtonPaths {
   readonly gnupg: AbsolutePath;

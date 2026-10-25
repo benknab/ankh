@@ -2,7 +2,7 @@ import { expect, it } from "@effect/vitest";
 import { ConfigProvider, Deferred, Effect, Fiber, Layer, Ref, Result } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
 import { TestClock } from "effect/testing";
-import { transport } from "#telemetry/transport.ts";
+import { transport } from "#/telemetry/transport.ts";
 
 for (const body of [false, true]) {
   it.effect(

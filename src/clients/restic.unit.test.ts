@@ -1,12 +1,12 @@
 import { expect, it } from "@effect/vitest";
 import { Effect, FileSystem, Layer, Logger, Path, Schema } from "effect";
-import { ResticClient } from "#clients/restic.ts";
-import { Restic } from "#domain/model.ts";
-import { Commands } from "#process/commands.ts";
-import { Storage } from "#storage/storage.ts";
-import { withExecution } from "#telemetry/execution.ts";
-import { output } from "#testing/commands.ts";
-import { fixture } from "#testing/fixtures.ts";
+import { ResticClient } from "#/clients/restic.ts";
+import { Restic } from "#/domain/model.ts";
+import { Commands } from "#/process/commands.ts";
+import { Storage } from "#/storage/storage.ts";
+import { withExecution } from "#/telemetry/execution.ts";
+import { output } from "#/testing/commands.ts";
+import { fixture } from "#/testing/fixtures.ts";
 
 it.effect("clients built before a run preserve its dynamic logging context", () =>
   Effect.gen(function* () {

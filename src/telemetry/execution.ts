@@ -9,7 +9,7 @@ import {
   Ref,
   References,
 } from "effect";
-import type { Job } from "#domain/model.ts";
+import type { Job } from "#/domain/model.ts";
 import {
   type Completion,
   type Details,
@@ -17,9 +17,9 @@ import {
   type Operation,
   type Step,
   status,
-} from "#telemetry/event.ts";
-import { collector, make, type Messages, ProgressLog } from "#telemetry/messages.ts";
-import { fields } from "#telemetry/values.ts";
+} from "#/telemetry/event.ts";
+import { collector, make, type Messages, ProgressLog } from "#/telemetry/messages.ts";
+import { fields } from "#/telemetry/values.ts";
 
 export class Execution extends Context.Service<
   Execution,

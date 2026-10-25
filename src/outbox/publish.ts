@@ -1,15 +1,15 @@
 import { DateTime, Effect } from "effect";
-import { ArchiveClient } from "#clients/archive.ts";
-import { type Archive, archiveName } from "#domain/archive.ts";
+import { ArchiveClient } from "#/clients/archive.ts";
+import { type Archive, archiveName } from "#/domain/archive.ts";
 import {
   type AbsolutePath,
   absolutePath,
   BackupError,
   type Job,
   type Proton,
-} from "#domain/model.ts";
-import { privateDirectory, Storage } from "#storage/storage.ts";
-import { track } from "#telemetry/execution.ts";
+} from "#/domain/model.ts";
+import { privateDirectory, Storage } from "#/storage/storage.ts";
+import { track } from "#/telemetry/execution.ts";
 
 const publish = Effect.fn("Outbox.publish")(function* (
   stage: AbsolutePath,

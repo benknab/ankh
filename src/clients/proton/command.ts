@@ -1,7 +1,7 @@
 import { Array, Duration, Effect, Option, Predicate, Redacted } from "effect";
-import { BackupError } from "#domain/model.ts";
-import { type Argument, Commands } from "#process/commands.ts";
-import { keyProtection, ProtonState, protonEnvironment } from "#clients/proton/state.ts";
+import { BackupError } from "#/domain/model.ts";
+import { type Argument, Commands } from "#/process/commands.ts";
+import { keyProtection, ProtonState, protonEnvironment } from "#/clients/proton/state.ts";
 
 const lockConflict = 75;
 

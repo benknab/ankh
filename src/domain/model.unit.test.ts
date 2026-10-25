@@ -1,7 +1,7 @@
 import { expect, it } from "@effect/vitest";
 import { Effect, Result, Schema } from "effect";
-import { Job, RemoteFolder } from "#domain/model.ts";
-import { fixture } from "#testing/fixtures.ts";
+import { Job, RemoteFolder } from "#/domain/model.ts";
+import { fixture } from "#/testing/fixtures.ts";
 
 it.effect("schemas reject unsafe paths, names, duplicate destinations, and empty retention", () =>
   Effect.gen(function* () {

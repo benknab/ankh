@@ -1,9 +1,9 @@
 import { Effect } from "effect";
-import { backupError } from "#domain/model.ts";
-import { runProton } from "#clients/proton/command.ts";
-import { setupCredentials } from "#clients/proton/credentials.ts";
-import { ProtonState } from "#clients/proton/state.ts";
-import { privateDirectory } from "#storage/storage.ts";
+import { backupError } from "#/domain/model.ts";
+import { runProton } from "#/clients/proton/command.ts";
+import { setupCredentials } from "#/clients/proton/credentials.ts";
+import { ProtonState } from "#/clients/proton/state.ts";
+import { privateDirectory } from "#/storage/storage.ts";
 
 export const login = Effect.fn("Proton.login")(
   function* () {

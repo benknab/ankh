@@ -1,8 +1,8 @@
 import { type Cron, Effect, Schedule } from "effect";
-import type { AbsolutePath, JobSchedule } from "#domain/model.ts";
-import { runJob } from "#app/runner.ts";
-import { loadJob } from "#storage/storage.ts";
-import { describeJob, track, withExecution } from "#telemetry/execution.ts";
+import type { AbsolutePath, JobSchedule } from "#/domain/model.ts";
+import { runJob } from "#/app/runner.ts";
+import { loadJob } from "#/storage/storage.ts";
+import { describeJob, track, withExecution } from "#/telemetry/execution.ts";
 
 export const scheduledAttempts = <E, R>(
   backup: Effect.Effect<void, E, R>,

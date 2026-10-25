@@ -1,9 +1,9 @@
 import { expect, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Ref, Schema } from "effect";
-import { Job } from "#domain/model.ts";
-import { Storage, withLock } from "#storage/storage.ts";
-import { infrastructure } from "#testing/infrastructure.ts";
-import { fixture } from "#testing/fixtures.ts";
+import { Job } from "#/domain/model.ts";
+import { Storage, withLock } from "#/storage/storage.ts";
+import { infrastructure } from "#/testing/infrastructure.ts";
+import { fixture } from "#/testing/fixtures.ts";
 
 it.live("concurrent scheduled jobs wait for the shared drive lock", () =>
   Effect.gen(function* () {

@@ -1,9 +1,9 @@
 import { expect, it } from "@effect/vitest";
 import { Array, Effect, FileSystem, Layer, Path, Ref, Result, Schema } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
-import { GiteaClient } from "#clients/gitea.ts";
-import { Gitea } from "#domain/model.ts";
-import { Storage } from "#storage/storage.ts";
+import { GiteaClient } from "#/clients/gitea.ts";
+import { Gitea } from "#/domain/model.ts";
+import { Storage } from "#/storage/storage.ts";
 
 const source = Schema.decodeEffect(Gitea)({
   type: "gitea-git",

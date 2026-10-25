@@ -13,12 +13,12 @@ import {
   Result,
   Schema,
 } from "effect";
-import { type Argument, Commands, type Options } from "#process/commands.ts";
-import { absolutePath, BackupError, JobName, Proton } from "#domain/model.ts";
-import { ProtonDrive } from "#clients/proton/client.ts";
-import { archiveName } from "#domain/archive.ts";
-import { Storage } from "#storage/storage.ts";
-import { output } from "#testing/commands.ts";
+import { type Argument, Commands, type Options } from "#/process/commands.ts";
+import { absolutePath, BackupError, JobName, Proton } from "#/domain/model.ts";
+import { ProtonDrive } from "#/clients/proton/client.ts";
+import { archiveName } from "#/domain/archive.ts";
+import { Storage } from "#/storage/storage.ts";
+import { output } from "#/testing/commands.ts";
 
 const destinationConfig = Schema.decodeEffect(Proton)({
   type: "proton-drive",

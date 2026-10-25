@@ -1,6 +1,6 @@
 import { Effect, Redacted, Schema } from "effect";
-import type { AbsolutePath } from "#domain/model.ts";
-import { Storage } from "#storage/storage.ts";
+import type { AbsolutePath } from "#/domain/model.ts";
+import { Storage } from "#/storage/storage.ts";
 
 export const Secret = Schema.Redacted(Schema.NonEmptyString.check(Schema.isPattern(/^[^\0]+$/u)), {
   disallowJsonEncode: true,

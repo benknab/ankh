@@ -1,8 +1,8 @@
 import { Context, Effect, Layer } from "effect";
-import { backupError, type BackupError, type Postgres } from "#domain/model.ts";
-import { Commands } from "#process/commands.ts";
-import { Storage } from "#storage/storage.ts";
-import { readSecret } from "#storage/secrets.ts";
+import { backupError, type BackupError, type Postgres } from "#/domain/model.ts";
+import { Commands } from "#/process/commands.ts";
+import { Storage } from "#/storage/storage.ts";
+import { readSecret } from "#/storage/secrets.ts";
 
 export class PostgresClient extends Context.Service<
   PostgresClient,

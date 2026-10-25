@@ -1,8 +1,8 @@
 import { Context, Effect, Layer, Redacted, Schema } from "effect";
-import type { Archive } from "#domain/archive.ts";
-import { type AbsolutePath, backupError, type BackupError } from "#domain/model.ts";
-import { Commands } from "#process/commands.ts";
-import { Storage } from "#storage/storage.ts";
+import type { Archive } from "#/domain/archive.ts";
+import { type AbsolutePath, backupError, type BackupError } from "#/domain/model.ts";
+import { Commands } from "#/process/commands.ts";
+import { Storage } from "#/storage/storage.ts";
 
 const verify = Effect.fn("ArchiveClient.verify")(function* (archive: Archive) {
   const { fs } = yield* Storage;

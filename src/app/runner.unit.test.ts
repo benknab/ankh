@@ -1,11 +1,11 @@
 import { expect, it } from "@effect/vitest";
 import { Array, Effect, HashSet, Layer, Ref, Result, Schema } from "effect";
-import { Destinations } from "#destinations/destinations.ts";
-import { absolutePath, BackupError, Job } from "#domain/model.ts";
-import { execute } from "#app/runner.ts";
-import { Sources } from "#sources/sources.ts";
+import { Destinations } from "#/destinations/destinations.ts";
+import { absolutePath, BackupError, Job } from "#/domain/model.ts";
+import { execute } from "#/app/runner.ts";
+import { Sources } from "#/sources/sources.ts";
 
-import { fixture } from "#testing/fixtures.ts";
+import { fixture } from "#/testing/fixtures.ts";
 
 for (const reverse of [false, true]) {
   for (const failed of ["restic", "proton-drive"] as const) {

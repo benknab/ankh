@@ -41,7 +41,7 @@ Do not use v3 examples or a separate copy of Effect documentation.
   backup command, Git/LFS, Restic, tar/zstd, GPG/pass, and the official Proton
   CLI remain external tools; do not reimplement their protocols.
 - Use test layers to exercise failures without credentials or production mounts.
-- Use `#` imports for local modules and Vitest `expect` matchers in tests.
+- Use `#/` imports for local modules and Vitest `expect` matchers in tests.
 - Put typed tool clients in `src/clients/`. Source and destination adapters
   implement the contracts in `src/domain/adapters.ts`.
 - Start execution telemetry at command and scheduled-attempt boundaries. Emit

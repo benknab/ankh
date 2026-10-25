@@ -1,9 +1,9 @@
 import { Layer, References } from "effect";
 import { OtlpLogger, OtlpTracer } from "effect/observability";
-import metadata from "#package" with { type: "json" };
-import { Logging } from "#telemetry/logging.ts";
-import { Serialization } from "#telemetry/serialization.ts";
-import { transport } from "#telemetry/transport.ts";
+import metadata from "#/package" with { type: "json" };
+import { Logging } from "#/telemetry/logging.ts";
+import { Serialization } from "#/telemetry/serialization.ts";
+import { transport } from "#/telemetry/transport.ts";
 
 const resource = { serviceName: metadata.name, serviceVersion: metadata.version };
 

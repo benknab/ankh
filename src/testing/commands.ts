@@ -1,5 +1,5 @@
 import { Redacted } from "effect";
-import type { CommandOutput } from "#process/commands.ts";
+import type { CommandOutput } from "#/process/commands.ts";
 
 export const output = (stdout: string): CommandOutput => ({
   stdout: Redacted.make(stdout),

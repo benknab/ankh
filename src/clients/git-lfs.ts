@@ -1,5 +1,5 @@
 import { Effect, Redacted, Schema } from "effect";
-import { Commands, type Options } from "#process/commands.ts";
+import { Commands, type Options } from "#/process/commands.ts";
 
 const Revisions = Schema.Array(Schema.String.check(Schema.isPattern(/^[a-f0-9]{40,64}$/u)));
 

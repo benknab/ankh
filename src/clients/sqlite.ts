@@ -1,6 +1,6 @@
 import { Array, Context, Effect, Layer, Redacted, Schema } from "effect";
-import { type AbsolutePath, backupError, type BackupError } from "#domain/model.ts";
-import { Commands } from "#process/commands.ts";
+import { type AbsolutePath, backupError, type BackupError } from "#/domain/model.ts";
+import { Commands } from "#/process/commands.ts";
 
 const Integrity = Schema.Literal("ok");
 

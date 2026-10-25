@@ -1,6 +1,6 @@
 import { expect, it } from "@effect/vitest";
 import { Effect, Layer, Logger, References } from "effect";
-import { Info, Debug } from "#telemetry/logging.ts";
+import { Info, Debug } from "#/telemetry/logging.ts";
 
 for (const [name, layer, expected] of [
   ["info", Info, "Info"],

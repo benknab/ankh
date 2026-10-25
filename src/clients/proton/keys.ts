@@ -1,7 +1,7 @@
 import { Array, Effect, Option, Redacted, Schema } from "effect";
-import { BackupError, backupError } from "#domain/model.ts";
-import { runProton } from "#clients/proton/command.ts";
-import { type KeyProtection, passphraseArguments, ProtonState } from "#clients/proton/state.ts";
+import { BackupError, backupError } from "#/domain/model.ts";
+import { runProton } from "#/clients/proton/command.ts";
+import { type KeyProtection, passphraseArguments, ProtonState } from "#/clients/proton/state.ts";
 
 // Keep the stored key identity stable across the Ankh rename.
 const identity = "backup-runner@localhost";

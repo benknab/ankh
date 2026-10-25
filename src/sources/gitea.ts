@@ -1,9 +1,9 @@
 import { Array, DateTime, Effect, Schema, String } from "effect";
-import { GiteaClient, type Repository } from "#clients/gitea.ts";
-import { GitClient } from "#clients/git.ts";
-import type { SourceAdapter } from "#domain/adapters.ts";
-import { type AbsolutePath, backupError, type Gitea } from "#domain/model.ts";
-import { privateDirectory, Storage } from "#storage/storage.ts";
+import { GiteaClient, type Repository } from "#/clients/gitea.ts";
+import { GitClient } from "#/clients/git.ts";
+import type { SourceAdapter } from "#/domain/adapters.ts";
+import { type AbsolutePath, backupError, type Gitea } from "#/domain/model.ts";
+import { privateDirectory, Storage } from "#/storage/storage.ts";
 
 const Manifest = Schema.fromJsonString(
   Schema.Struct({ createdAt: Schema.String, repositories: Schema.Array(Schema.String) }),
