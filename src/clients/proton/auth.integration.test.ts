@@ -71,8 +71,8 @@ it.live("unprotected Proton credential setup creates a usable private store", ()
       expect(((yield* fs.stat(directory)).mode & 0o777).toString(8)).toBe("700");
     }
     expect(
-      yield* fs.exists(`${paths.passwordStore}/ankh-probe.gpg`),
-      "the store probe must be removed",
+      yield* fs.exists(`${paths.passwordStore}/ch.proton.drive`),
+      "the store probe and its folders must be removed",
     ).toBe(false);
     expect(yield* fs.readFileString(`${paths.gnupg}/gpg-agent.conf`)).toBe(
       "default-cache-ttl 0\nmax-cache-ttl 0\n",
@@ -156,10 +156,22 @@ it.live("a password store for another key fails before the browser login", () =>
     const { fs } = yield* Storage;
     const { logins, run } = yield* stubbedLogin();
     yield* run;
+    const recipients = yield* fs.readFileString(`${paths.passwordStore}/.gpg-id`);
     yield* fs.writeFileString(`${paths.passwordStore}/.gpg-id`, `${"0".repeat(40)}\n`);
     const result = yield* run.pipe(Effect.result);
     expect(messageOf(result)).toContain("different key");
     expect(messageOf(yield* verifyCredentials().pipe(Effect.result))).toContain("different key");
+    yield* fs.writeFileString(`${paths.passwordStore}/.gpg-id`, recipients);
+    const session = `${paths.passwordStore}/ch.proton.drive/drive-sdk-cli`;
+    yield* fs.makeDirectory(session, { recursive: true, mode: 0o700 });
+    yield* fs.writeFileString(`${session}/.gpg-id`, `${"0".repeat(40)}\n`);
+    expect(
+      messageOf(yield* run.pipe(Effect.result)),
+      "a nested recipient would encrypt the session to another key",
+    ).toContain("overrides the Proton key");
+    expect(messageOf(yield* verifyCredentials().pipe(Effect.result))).toContain(
+      "overrides the Proton key",
+    );
     expect(yield* Ref.get(logins), "mismatched stores must not start a login").toHaveLength(1);
   }).pipe(Effect.provideServiceEffect(ProtonState, isolated()), Effect.provide(infrastructure)),
 );
