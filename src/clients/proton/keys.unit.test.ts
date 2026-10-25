@@ -1,6 +1,6 @@
 import { expect, it } from "@effect/vitest";
 import { Array, Effect, Result } from "effect";
-import { parseProtection, parseSecretKeys } from "#clients/proton/credentials.ts";
+import { parseProtection, parseSecretKeys } from "#clients/proton/keys.ts";
 
 const primary = "930CF490C7E7D549C32269B5F69663CD9738BE10";
 const primaryGrip = "B30F89975CDFCF832544F1A734FB301A8929B2D7";
