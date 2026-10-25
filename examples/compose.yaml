@@ -1,6 +1,6 @@
 services:
   backup:
-    image: ${BACKUP_RUNNER_IMAGE:-backup-runner:local}
+    image: ${ANKH_IMAGE:-ankh:local}
     build:
       context: ..
     platform: linux/amd64

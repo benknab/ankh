@@ -71,7 +71,7 @@ export class Outbox extends Context.Service<
     ) => Effect.Effect<void, BackupError>;
     readonly check: (job: Job, destination: Proton) => Effect.Effect<void, BackupError>;
   }
->()("backup-runner/outbox/outbox") {
+>()("ankh/outbox/outbox") {
   public static readonly layer = Layer.effect(
     Outbox,
     Effect.gen(function* () {

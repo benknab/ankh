@@ -139,7 +139,7 @@ OTEL_TRACES_EXPORTER=otlp
 The runner sends HTTP/JSON to `/v1/logs` and `/v1/traces`. Export is off by default;
 `OTEL_SDK_DISABLED=true` also disables it. Console JSON output stays enabled.
 Effect supports signal-specific endpoints, headers, timeouts, batch settings,
-and `OTEL_RESOURCE_ATTRIBUTES`. The service name is `backup-runner`.
+and `OTEL_RESOURCE_ATTRIBUTES`. The service name is `ankh`.
 Each export HTTP attempt, including response-body reads, has a deadline. It uses
 the signal timeout, then `OTEL_EXPORTER_OTLP_TIMEOUT`, then the signal processor's
 export timeout, or 10 seconds by default. Effect's retry policy still applies.

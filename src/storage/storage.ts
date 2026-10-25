@@ -25,7 +25,7 @@ export class Storage extends Context.Service<
     readonly fs: FileSystem.FileSystem;
     readonly path: Path.Path;
   }
->()("backup-runner/storage/storage") {
+>()("ankh/storage/storage") {
   public static readonly layer = Layer.effect(
     Storage,
     Effect.gen(function* () {

@@ -9,7 +9,7 @@ export class SqliteClient extends Context.Service<
   {
     readonly backup: (source: AbsolutePath, target: string) => Effect.Effect<void, BackupError>;
   }
->()("backup-runner/clients/sqlite/SqliteClient") {
+>()("ankh/clients/sqlite/SqliteClient") {
   public static readonly layer = Layer.effect(
     SqliteClient,
     Effect.gen(function* () {

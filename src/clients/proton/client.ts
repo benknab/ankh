@@ -61,7 +61,7 @@ export class ProtonDrive extends Context.Service<
       names: HashSet.HashSet<ArchiveName>,
     ) => Effect.Effect<void, BackupError>;
   }
->()("backup-runner/clients/proton/client/ProtonDrive") {
+>()("ankh/clients/proton/client/ProtonDrive") {
   public static readonly layer = Layer.effect(
     ProtonDrive,
     Effect.gen(function* () {

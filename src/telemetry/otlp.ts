@@ -5,7 +5,7 @@ import { Logging } from "#telemetry/logging.ts";
 import { Serialization } from "#telemetry/serialization.ts";
 import { transport } from "#telemetry/transport.ts";
 
-const resource = { serviceName: "backup-runner", serviceVersion: metadata.version };
+const resource = { serviceName: metadata.name, serviceVersion: metadata.version };
 
 export const Otlp = Layer.mergeAll(
   OtlpLogger.layerFromConfig({ resource }).pipe(Layer.provide(transport("LOGS"))),

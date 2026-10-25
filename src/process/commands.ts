@@ -65,7 +65,7 @@ export class Commands extends Context.Service<
       options?: Options,
     ) => Effect.Effect<CommandOutput, BackupError>;
   }
->()("backup-runner/process/commands") {
+>()("ankh/process/commands") {
   public static readonly layer = Layer.effect(
     Commands,
     Effect.gen(function* () {

@@ -66,7 +66,7 @@ it.live("command output stays exact and hidden even for unknown secrets and spaw
       secret,
     );
     const failed = yield* commands
-      .run("missing-backup-runner-command", [Redacted.make(secret)])
+      .run("missing-ankh-command", [Redacted.make(secret)])
       .pipe(Effect.result);
     expect(Result.isFailure(failed)).toBe(true);
     if (Result.isFailure(failed)) {

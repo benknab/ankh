@@ -2,7 +2,7 @@
 set -euo pipefail
 
 root=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-project="backup-runner-tests-$$-$RANDOM"
+project="ankh-tests-$$-$RANDOM"
 compose=(docker compose --project-name "$project" --file "$root/tools/integration/compose.yaml")
 
 docker info >/dev/null

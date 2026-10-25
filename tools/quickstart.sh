@@ -2,21 +2,21 @@
 set -euo pipefail
 
 root=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-state=$(mktemp -d "${TMPDIR:-/tmp}/backup-runner-example.XXXXXX")
+state=$(mktemp -d "${TMPDIR:-/tmp}/ankh-example.XXXXXX")
 export SOURCE_DIR="$state/source" BACKUP_DIR="$state/backups"
 export SECRETS_DIR="$state/secrets" STAGING_DIR="$state/staging"
 export JOB_FILE="$root/examples/sqlite-restic.job.json"
-export BACKUP_RUNNER_IMAGE="backup-runner-example-$$:$RANDOM"
-compose=(docker compose --project-name "backup-runner-example-$$" --file "$root/examples/compose.yaml")
+export ANKH_IMAGE="ankh-example-$$:$RANDOM"
+compose=(docker compose --project-name "ankh-example-$$" --file "$root/examples/compose.yaml")
 
 cleanup() {
   local status=$?
   trap - EXIT INT TERM
   "${compose[@]}" down --volumes --remove-orphans || status=1
-  if docker image inspect "$BACKUP_RUNNER_IMAGE" >/dev/null 2>&1; then
-    docker run --rm --platform linux/amd64 --volume "$state:/cleanup" --entrypoint sh "$BACKUP_RUNNER_IMAGE" \
+  if docker image inspect "$ANKH_IMAGE" >/dev/null 2>&1; then
+    docker run --rm --platform linux/amd64 --volume "$state:/cleanup" --entrypoint sh "$ANKH_IMAGE" \
       -c 'rm -rf /cleanup/source /cleanup/backups /cleanup/secrets /cleanup/staging /cleanup/restore' || status=1
-    docker image rm "$BACKUP_RUNNER_IMAGE" >/dev/null 2>&1 || status=1
+    docker image rm "$ANKH_IMAGE" >/dev/null 2>&1 || status=1
   fi
   rm -rf -- "$state"
   exit "$status"

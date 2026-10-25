@@ -44,7 +44,7 @@ export class ArchiveClient extends Context.Service<
     readonly create: (stage: AbsolutePath, archive: Archive) => Effect.Effect<void, BackupError>;
     readonly verify: (archive: Archive) => Effect.Effect<void, BackupError>;
   }
->()("backup-runner/clients/archive/ArchiveClient") {
+>()("ankh/clients/archive/ArchiveClient") {
   public static readonly layer = Layer.effect(
     ArchiveClient,
     Effect.gen(function* () {

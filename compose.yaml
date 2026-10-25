@@ -1,10 +1,10 @@
-name: backup-runner
+name: ankh
 
 services:
   proton-auth:
     build:
       context: .
-    image: backup-runner:local
+    image: ankh:local
     platform: linux/amd64
     command:
       - proton-login

@@ -30,7 +30,7 @@ export class Execution extends Context.Service<
     readonly logs: MutableRef.MutableRef<Messages>;
     readonly sinks: ReadonlySet<Logger.Logger<unknown, unknown>>;
   }
->()("backup-runner/telemetry/execution") {}
+>()("ankh/telemetry/execution") {}
 
 const complete = Effect.fnUntraced(function* <A, E>(
   run: Execution["Service"],

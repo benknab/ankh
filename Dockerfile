@@ -3,7 +3,7 @@ FROM node:24.22.1-bookworm-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b34
 USER root
 
 ARG TARGETARCH
-RUN test "$TARGETARCH" = amd64 || (echo "backup-runner supports linux/amd64 only" >&2; exit 1)
+RUN test "$TARGETARCH" = amd64 || (echo "ankh supports linux/amd64 only" >&2; exit 1)
 
 ARG PROTON_DRIVE_VERSION=0.8.0
 ARG PROTON_DRIVE_SHA512=a730f9e420fef69244acb9b12aa8e0c03b8216f5d94ff2181cf3df2859a143fc2693fe201c3a00fddaff5d702c34435af72a5283dbbe1da9e038d77a107e24f3
@@ -40,8 +40,8 @@ WORKDIR /app
 
 RUN npm install --global pnpm@12.15.0
 
-COPY LICENSE THIRD_PARTY_NOTICES.md /usr/local/share/doc/backup-runner/
-LABEL org.opencontainers.image.source="https://github.com/benknab/backup-runner" \
+COPY LICENSE THIRD_PARTY_NOTICES.md /usr/local/share/doc/ankh/
+LABEL org.opencontainers.image.source="https://github.com/benknab/ankh" \
       org.opencontainers.image.licenses="MIT"
 
 FROM base AS runner

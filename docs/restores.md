@@ -41,7 +41,7 @@ docker run --rm --platform linux/amd64 \
   -e GNUPGHOME=/proton/gnupg -e HOME=/tmp \
   -e PASSWORD_STORE_DIR=/proton/pass -e PROTON_DRIVE_CACHE_DIR=/proton/cache \
   -e PROTON_DRIVE_CREDENTIALS_STORE=pass -e PROTON_DRIVE_LOG_LEVEL=WARNING \
-  --entrypoint proton-drive backup-runner:local filesystem download \
+  --entrypoint proton-drive ankh:local filesystem download \
   '/my-files/Backups/example-host/example-job/ARCHIVE.tar.zst' \
   '/my-files/Backups/example-host/example-job/ARCHIVE.tar.zst.sha256' /download
 ```
@@ -52,7 +52,7 @@ Use the same locally built image as the backup job.
 
 ```sh
 docker run --rm --platform linux/amd64 -v /path/to/download:/restore \
-  --entrypoint sh backup-runner:local -ec \
+  --entrypoint sh ankh:local -ec \
   'cd /restore; sha256sum --check ARCHIVE.tar.zst.sha256; zstd --test ARCHIVE.tar.zst; mkdir extracted; tar --use-compress-program=zstd --extract --file ARCHIVE.tar.zst --directory extracted'
 ```
 

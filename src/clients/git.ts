@@ -37,7 +37,7 @@ export class GitClient extends Context.Service<
   {
     readonly mirror: (repository: GitRepository) => Effect.Effect<void, BackupError>;
   }
->()("backup-runner/clients/git/GitClient") {
+>()("ankh/clients/git/GitClient") {
   public static readonly layer = Layer.effect(
     GitClient,
     Effect.gen(function* () {

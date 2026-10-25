@@ -35,7 +35,7 @@ export class Sources extends Context.Service<
   {
     readonly stage: (job: Job) => Effect.Effect<AbsolutePath, BackupError>;
   }
->()("backup-runner/sources/sources") {
+>()("ankh/sources/sources") {
   public static readonly layer = Layer.effect(
     Sources,
     Effect.gen(function* () {

@@ -19,7 +19,7 @@ export class GiteaClient extends Context.Service<
       source: typeof Gitea.Type,
     ) => Effect.Effect<readonly Repository[], BackupError>;
   }
->()("backup-runner/clients/gitea/GiteaClient") {
+>()("ankh/clients/gitea/GiteaClient") {
   public static readonly layer = Layer.effect(
     GiteaClient,
     Effect.gen(function* () {

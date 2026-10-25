@@ -22,7 +22,7 @@ export class ProtonCli extends Context.Service<
     readonly upload: (folder: string, files: readonly string[]) => Effect.Effect<void, BackupError>;
     readonly trash: (files: readonly string[]) => Effect.Effect<void, BackupError>;
   }
->()("backup-runner/clients/proton/cli/ProtonCli") {
+>()("ankh/clients/proton/cli/ProtonCli") {
   public static readonly layer = Layer.effect(
     ProtonCli,
     Effect.gen(function* () {

@@ -31,7 +31,7 @@ const commands = Array.map(Actions, (action) =>
   ).pipe(Command.withDescription(descriptions[action])),
 );
 
-const cli = Command.make("backup-runner").pipe(
+const cli = Command.make(metadata.name).pipe(
   Command.withSubcommands([
     ...commands,
     Command.make("validate", { job: jobArgument }, ({ job }) => validate(job)).pipe(

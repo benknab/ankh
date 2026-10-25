@@ -8,7 +8,7 @@ services:
         bind: { create_host_path: false }
       - proton-state:/proton
   proton-auth:
-    image: ${BACKUP_RUNNER_IMAGE:-backup-runner:local}
+    image: ${ANKH_IMAGE:-ankh:local}
     platform: linux/amd64
     command: ["proton-login"]
     read_only: true

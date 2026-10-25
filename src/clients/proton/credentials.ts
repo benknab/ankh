@@ -3,6 +3,7 @@ import { Commands } from "#process/commands.ts";
 import { backupError } from "#domain/model.ts";
 import { protonEnvironment } from "#clients/proton/state.ts";
 
+// Keep the stored key identity stable across the Ankh rename.
 const identity = "backup-runner@localhost";
 const options = { env: protonEnvironment };
 const Fingerprint = Schema.String.check(Schema.isPattern(/^[A-F0-9]{40,64}$/u));
@@ -24,7 +25,7 @@ const ensureIdentity = Effect.fn("Proton.ensureIdentity")(function* () {
         "--passphrase",
         "",
         "--quick-generate-key",
-        `Backup Runner <${identity}>`,
+        `Ankh <${identity}>`,
         "default",
         "default",
         "0",

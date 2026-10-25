@@ -12,7 +12,7 @@ export class PostgresClient extends Context.Service<
       target: string,
     ) => Effect.Effect<void, BackupError>;
   }
->()("backup-runner/clients/postgres/PostgresClient") {
+>()("ankh/clients/postgres/PostgresClient") {
   public static readonly layer = Layer.effect(
     PostgresClient,
     Effect.gen(function* () {

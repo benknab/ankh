@@ -18,7 +18,7 @@ it.live("Node runs the TypeScript CLI and rejects unsafe job paths", () =>
     }
     const version = yield* commands.run(process.execPath, [entry, "--version"]);
     expect(Redacted.value(version.stdout).trim(), "CLI must use the package version").toBe(
-      `backup-runner v${metadata.version}`,
+      `${metadata.name} v${metadata.version}`,
     );
     const invalid = yield* commands
       .run(process.execPath, [entry, "backup", "relative/job.json"])

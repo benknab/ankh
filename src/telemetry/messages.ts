@@ -29,10 +29,9 @@ export interface Messages {
   readonly droppedFields: number;
 }
 
-export const ProgressLog = Context.Reference<boolean>(
-  "backup-runner/telemetry/messages/ProgressLog",
-  { defaultValue: () => false },
-);
+export const ProgressLog = Context.Reference<boolean>("ankh/telemetry/messages/ProgressLog", {
+  defaultValue: () => false,
+});
 
 export const make = (): MutableRef.MutableRef<Messages> =>
   MutableRef.make({ messages: [], data: {}, droppedMessages: 0, droppedFields: 0 });

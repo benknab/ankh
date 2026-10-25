@@ -16,7 +16,7 @@ export class Destinations extends Context.Service<
       request: DestinationRequest,
     ) => Effect.Effect<void, BackupError>;
   }
->()("backup-runner/destinations/destinations") {
+>()("ankh/destinations/destinations") {
   public static readonly layer = Layer.effect(
     Destinations,
     Effect.gen(function* () {

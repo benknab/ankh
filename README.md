@@ -1,4 +1,4 @@
-# Backup runner
+# Ankh
 
 Backs up SQLite and PostgreSQL databases and Git repositories hosted on Gitea,
 including Git LFS objects. Keeps encrypted local snapshots with Restic and uploads

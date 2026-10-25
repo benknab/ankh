@@ -74,7 +74,7 @@ export class ResticClient extends Context.Service<
     ) => Effect.Effect<void, BackupError>;
     readonly check: (destination: Restic, readData: boolean) => Effect.Effect<void, BackupError>;
   }
->()("backup-runner/clients/restic/ResticClient") {
+>()("ankh/clients/restic/ResticClient") {
   public static readonly layer = Layer.effect(
     ResticClient,
     Effect.gen(function* () {

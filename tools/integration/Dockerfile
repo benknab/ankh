@@ -1,4 +1,4 @@
-FROM backup-runner-toolchain
+FROM ankh-toolchain
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
