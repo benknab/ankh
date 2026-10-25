@@ -191,6 +191,34 @@ it.live("a corrupt ready archive stays on disk while later valid archives upload
   }).pipe(Effect.provide(outboxInfrastructure)),
 );
 
+for (const member of ["archive", "checksum"] as const) {
+  it.live(`an orphan legacy ${member} fails verification and stays available for recovery`, () =>
+    Effect.gen(function* () {
+      const { fs, path } = yield* Storage;
+      const outbox = yield* Outbox;
+      const root = yield* fs.makeTempDirectoryScoped();
+      const destination = yield* Schema.decodeEffect(Proton)({
+        type: "proton-drive",
+        outbox: root,
+        remoteFolder: "/my-files/a",
+      });
+      const job = yield* Schema.decodeUnknownEffect(Job)(fixture);
+      const name = "test-job-20261025T033000000Z.tar.zst";
+      yield* fs.writeFileString(
+        path.join(root, member === "archive" ? name : `${name}.sha256`),
+        member === "archive" ? "incomplete" : `${"a".repeat(64)}  ${name}\n`,
+      );
+      const checked = yield* outbox.check(job, destination).pipe(Effect.result);
+      expect(Result.isFailure(checked)).toBe(true);
+      const drained = yield* outbox
+        .drain(job, destination, () => Effect.die("must not upload incomplete pair"))
+        .pipe(Effect.result);
+      expect(Result.isFailure(drained)).toBe(true);
+      expect(yield* fs.readDirectory(root)).toHaveLength(1);
+    }).pipe(Effect.provide(outboxInfrastructure)),
+  );
+}
+
 for (const failure of ["tar", "checksum", "verify", "zstd", "publish", "cleanup"] as const) {
   it.live(`outbox ${failure} failure never exposes an incomplete archive pair`, () =>
     Effect.gen(function* () {

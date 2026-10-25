@@ -47,7 +47,14 @@ export const list = Effect.fn("Outbox.list")(function* (job: Job, destination: P
         : Effect.void,
     { discard: true },
   );
-  const entries = Array.sort(yield* fs.readDirectory(destination.outbox), String.Order);
+  const entries = Array.sort(
+    Array.dedupe(
+      Array.map(yield* fs.readDirectory(destination.outbox), (entry) =>
+        entry.endsWith(".tar.zst.sha256") ? entry.slice(0, -7) : entry,
+      ),
+    ),
+    String.Order,
+  );
   return Array.getSomes(
     yield* Effect.forEach(entries, (entry) => readEntry(job, destination, entry)),
   );
