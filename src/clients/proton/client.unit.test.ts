@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { Array, DateTime, Effect, HashSet, Layer, Ref, Result, Schema } from "effect";
+import { Array, DateTime, Effect, HashSet, Layer, Redacted, Ref, Result, Schema } from "effect";
 import { type Argument, Commands, type Options } from "#process/commands.ts";
 import { absolutePath, BackupError, JobName, Proton } from "#domain/model.ts";
 import { ProtonDrive } from "#clients/proton/client.ts";
@@ -19,6 +19,13 @@ const listing = Effect.fn("Test.listing")((names: Iterable<string>) =>
     Array.map(Array.fromIterable(names), (value) => ({ name: { ok: true, value }, type: "file" })),
   ).pipe(Effect.orDie),
 );
+const failedExit = (exitCode: number, stderr: string): BackupError =>
+  BackupError.make({
+    message: `flock exited ${exitCode}`,
+    operation: "flock",
+    exitCode,
+    cause: Redacted.make({ stdout: "", stderr }),
+  });
 
 it.effect("folder initialization only creates names missing from a successful listing", () =>
   Effect.gen(function* () {
@@ -93,6 +100,30 @@ it.effect("Proton commands run under the state lock with a pinned environment", 
       PASSWORD_STORE_KEY: "",
       PASSWORD_STORE_ENABLE_EXTENSIONS: "false",
     });
+  }),
+);
+
+it.effect("Proton CLI failures are described without exposing tool output", () =>
+  Effect.gen(function* () {
+    const destination = yield* destinationConfig;
+    const cases = [
+      [failedExit(1, "You need to login first\n"), "run proton-login", 1],
+      [failedExit(1, "Failed to load session in pass: gpg: decryption failed"), "decrypt", 1],
+      [failedExit(75, ""), "Proton state lock", undefined],
+      [failedExit(1, "unexpected trace with secrets"), "proton-drive exited 1", 1],
+    ] as const;
+    for (const [failure, expected, exitCode] of cases) {
+      const commands = Commands.of({ run: () => Effect.fail(failure) });
+      const result = yield* Effect.gen(function* () {
+        return yield* (yield* ProtonDrive).list(destination);
+      }).pipe(
+        Effect.provide(ProtonDrive.layer.pipe(Layer.provide(Layer.succeed(Commands, commands)))),
+        Effect.flip,
+      );
+      expect(result.message).toContain(expected);
+      expect(result.message).not.toContain("secrets");
+      expect(result.exitCode).toBe(exitCode);
+    }
   }),
 );
 

@@ -43,5 +43,7 @@ export const protonAdapter: DestinationAdapter<Proton, Outbox | ProtonDrive | St
       }
     },
     Effect.mapError(backupError("Proton destination")),
+    // Messages are written by Ankh and never include tool output, so they can name the fix.
+    Effect.tapError((error) => Effect.logWarning(error.message)),
   ),
 };
