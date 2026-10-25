@@ -1,5 +1,11 @@
 import { Effect } from "effect";
-import { BackupError, type DestinationRequest, type Job, type Proton } from "#domain/model.ts";
+import {
+  backupError,
+  BackupError,
+  type DestinationRequest,
+  type Job,
+  type Proton,
+} from "#domain/model.ts";
 import { Outbox } from "#outbox/outbox.ts";
 import { ProtonDrive } from "#clients/proton/client.ts";
 import { retainProton } from "#destinations/proton-retention.ts";
@@ -34,3 +40,9 @@ export const runProton = Effect.fn("Proton.run")(function* (
     );
   }
 });
+
+export const protonAdapter = {
+  run: Effect.fn("Proton.adapter")((job: Job, destination: Proton, request: DestinationRequest) =>
+    runProton(job, destination, request).pipe(Effect.mapError(backupError("Proton destination"))),
+  ),
+};
