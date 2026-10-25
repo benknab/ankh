@@ -2,7 +2,7 @@ import { Array, Effect, Option } from "effect";
 import { BackupError, backupError } from "#domain/model.ts";
 import { runProton } from "#clients/proton/command.ts";
 import { checkKey, ensureKey, requireKey } from "#clients/proton/keys.ts";
-import { keyProtection, ProtonState } from "#clients/proton/state.ts";
+import { type KeyProtection, keyProtection, ProtonState } from "#clients/proton/state.ts";
 import { Storage } from "#storage/storage.ts";
 
 // The CLI stores its session in this folder, and pass encrypts each entry to the nearest .gpg-id.
@@ -59,10 +59,20 @@ const ensureStore = Effect.fn("Proton.ensureStore")(function* (fingerprint: stri
 });
 
 // Prove that pass can encrypt and decrypt before the browser login creates a remote session.
-const probeStore = Effect.fn("Proton.probeStore")(function* () {
+const probeStore = Effect.fn("Proton.probeStore")(function* (protection: KeyProtection) {
+  const { gnupg, passwordStore } = yield* ProtonState;
   yield* runProton("pass", ["insert", "--force", "--multiline", probe]);
-  yield* runProton("pass", ["show", probe]);
-  yield* runProton("pass", ["rm", "--force", probe]);
+  yield* runProton("pass", ["show", probe]).pipe(
+    Effect.mapError((error) =>
+      protection._tag === "Passphrase"
+        ? BackupError.make({
+            message: `The Proton GPG key cannot be unlocked with ${protection.file}; to change the passphrase, remove ${gnupg} and ${passwordStore} and run proton-login`,
+            operation: "pass",
+          })
+        : error,
+    ),
+    Effect.ensuring(runProton("pass", ["rm", "--force", probe]).pipe(Effect.ignore)),
+  );
 });
 
 // Ankh passes the passphrase file on every call. A cached passphrase would let anything that
@@ -89,9 +99,10 @@ const ensureAgentConfig = Effect.fn("Proton.ensureAgentConfig")(function* () {
 
 export const setupCredentials = Effect.fn("Proton.setupCredentials")(function* () {
   yield* ensureAgentConfig();
-  const fingerprint = yield* ensureKey(yield* keyProtection());
+  const protection = yield* keyProtection();
+  const fingerprint = yield* ensureKey(protection);
   yield* ensureStore(fingerprint);
-  yield* probeStore();
+  yield* probeStore(protection);
 });
 
 export const verifyCredentials = Effect.fn("Proton.verifyCredentials")(function* () {

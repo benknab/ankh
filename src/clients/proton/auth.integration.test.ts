@@ -119,7 +119,13 @@ it.live("a passphrase file protects new keys and must stay available", () =>
     expect(yield* Ref.get(logins), "failed setup must not start a browser login").toHaveLength(1);
     yield* fs.writeFileString(paths.passphraseFile, "wrong passphrase\n", { mode: 0o600 });
     const wrong = yield* run.pipe(Effect.result);
-    expect(Result.isFailure(wrong), "a wrong passphrase must fail the store probe").toBe(true);
+    expect(messageOf(wrong), "a wrong passphrase must fail the store probe").toContain(
+      "cannot be unlocked",
+    );
+    expect(
+      yield* fs.exists(`${paths.passwordStore}/ch.proton.drive`),
+      "a failed probe must still be removed",
+    ).toBe(false);
     expect(yield* Ref.get(logins)).toHaveLength(1);
   }).pipe(Effect.provideServiceEffect(ProtonState, isolated()), Effect.provide(infrastructure)),
 );
