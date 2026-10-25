@@ -10,15 +10,27 @@ services:
       - proton-login
     volumes:
       - proton-state:/proton
+      # Supplies the optional proton-gpg-passphrase file.
+      - type: bind
+        source: ${SECRETS_DIR:?Set SECRETS_DIR to an existing secrets directory}
+        target: /secrets
+        read_only: true
+        bind:
+          create_host_path: false
     read_only: true
     tmpfs:
       - /tmp:size=64m,mode=1777
     cap_drop:
       - ALL
+    cap_add:
+      - DAC_OVERRIDE
     security_opt:
       - no-new-privileges:true
+    # The sign-in URL carries the session handoff key; show it without storing it.
+    logging:
+      driver: none
 
 volumes:
   proton-state:
-    name: backup-proton-state
+    name: ${PROTON_STATE_VOLUME:-backup-proton-state}
     external: true
