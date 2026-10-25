@@ -44,6 +44,8 @@ Do not use v3 examples or a separate copy of Effect documentation.
 - Write Effect tests with `it.effect` from `@effect/vitest`; use `it.live` for
   real subprocess and integration tests. Both manage the test scope. Use the
   provided `TestClock` in `it.effect` rather than starting a separate runtime.
+- Use `Layer.fresh` when injecting a replacement for a service already built in
+  the enclosing test layer. Assert that the injected failure actually occurred.
 
 ## Checks
 
@@ -78,3 +80,13 @@ files being changed; the generated lockfile is excluded.
 Run integration tests when changing process or filesystem behavior. Test scheduling
 with Effect's TestClock, including timezone handling and failure recovery. Enable
 scheduled services only after real backups and restores pass for every opted-in app.
+
+## Release checks
+
+Keep the production image in the root Dockerfile and the integration image in
+`tests/Dockerfile`. Run `bash tools/quickstart.sh` after changing container setup or
+examples; it verifies a real backup and restore using the production image.
+Keep the build-context allowlist free of credentials and deployment settings.
+Read `docs/releases.md` before publishing. Tags and released image versions are
+immutable; release notes must identify the source commit and anonymously verified
+image digest. Real Proton account tests remain separate from credential-free CI.

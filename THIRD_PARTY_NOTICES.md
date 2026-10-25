@@ -9,7 +9,7 @@ The image includes the unmodified official Proton Drive CLI executable. Its
 version and checksum are pinned in `Dockerfile`. Upstream source and its dependency
 notices are available at https://github.com/ProtonDriveApps/sdk/tree/cli/v0.8.0
 (revision `5491f2eea473acaaa86b5969774b84610a37bd46`). The executable embeds Bun;
-Bun's license and third-party notices are available at https://bun.com/docs/project/licensing.
+Bun's license and third-party notices are available at https://bun.com/docs/project/license.
 The runner's MIT license does not change those licenses or Proton's service terms.
 
 ## Proton Drive SDK and CLI
