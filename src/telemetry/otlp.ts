@@ -3,12 +3,13 @@ import { OtlpLogger, OtlpTracer } from "effect/observability";
 import metadata from "#package" with { type: "json" };
 import { Logging } from "#telemetry/logging.ts";
 import { Serialization } from "#telemetry/serialization.ts";
+import { transport } from "#telemetry/transport.ts";
 
 const resource = { serviceName: "backup-runner", serviceVersion: metadata.version };
 
 export const Otlp = Layer.mergeAll(
-  OtlpLogger.layerFromConfig({ resource }),
-  OtlpTracer.layerFromConfig({ resource }),
+  OtlpLogger.layerFromConfig({ resource }).pipe(Layer.provide(transport("LOGS"))),
+  OtlpTracer.layerFromConfig({ resource }).pipe(Layer.provide(transport("TRACES"))),
 ).pipe(
   Layer.provide(Serialization),
   // Exporter workers inherit Info so their debug diagnostics cannot expose

@@ -88,6 +88,7 @@ check. Authentication or network errors during discovery do not create folders.
 
 The default info layer writes one JSON completion line for each command or
 scheduled backup. The event is in `message`, with `event: execution.completed`.
+Scheduler startup emits a `schedule` completion event after it loads configuration.
 It contains `operation`, `status`, `durationMs`, job/source details when
 known, `traceId`, `spanId`, custom `messages` and `data`, and step summaries.
 Each step records attempts, failures, interruptions,
@@ -139,6 +140,9 @@ The runner sends HTTP/JSON to `/v1/logs` and `/v1/traces`. Export is off by defa
 `OTEL_SDK_DISABLED=true` also disables it. Console JSON output stays enabled.
 Effect supports signal-specific endpoints, headers, timeouts, batch settings,
 and `OTEL_RESOURCE_ATTRIBUTES`. The service name is `backup-runner`.
+Each export HTTP attempt, including response-body reads, has a deadline. It uses
+the signal timeout, then `OTEL_EXPORTER_OTLP_TIMEOUT`, then the signal processor's
+export timeout, or 10 seconds by default. Effect's retry policy still applies.
 
 The execution's `traceId` and `spanId` identify the run, even with export disabled.
 Nested executions share a trace but have different span IDs.
