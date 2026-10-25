@@ -114,7 +114,7 @@ for (const mode of ["failure", "defect", "interrupted", "cleanup"] as const) {
   );
 }
 
-it.effect("debug progress retains the execution ID across provided service contexts", () =>
+it.effect("debug progress still emits only one canonical event", () =>
   Effect.gen(function* () {
     const ids: unknown[] = [];
     const logger = Logger.make(({ fiber }: Logger.Options<unknown>): void => {
@@ -132,7 +132,7 @@ it.effect("debug progress retains the execution ID across provided service conte
         Layer.merge(Logger.layer([logger]), Layer.succeed(References.MinimumLogLevel, "Debug")),
       ),
     );
-    expect(ids).toStrictEqual([id, id, id]);
+    expect(ids).toStrictEqual([id]);
   }),
 );
 

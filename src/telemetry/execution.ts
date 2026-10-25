@@ -1,4 +1,16 @@
-import { Array, Clock, Context, Effect, type Exit, Option, Random, Ref } from "effect";
+import {
+  Array,
+  Clock,
+  Context,
+  Effect,
+  type Exit,
+  Logger,
+  MutableRef,
+  Option,
+  Random,
+  Ref,
+  References,
+} from "effect";
 import type { Job } from "#domain/model.ts";
 import {
   type Completion,
@@ -8,6 +20,8 @@ import {
   type Step,
   status,
 } from "#telemetry/event.ts";
+import { collector, make, type Messages, ProgressLog } from "#telemetry/messages.ts";
+import { fields } from "#telemetry/values.ts";
 
 export class Execution extends Context.Service<
   Execution,
@@ -16,6 +30,8 @@ export class Execution extends Context.Service<
     readonly operation: Operation;
     readonly started: number;
     readonly details: Ref.Ref<Details>;
+    readonly logs: MutableRef.MutableRef<Messages>;
+    readonly sinks: ReadonlySet<Logger.Logger<unknown, unknown>>;
   }
 >()("backup-runner/telemetry/execution") {}
 
@@ -27,20 +43,28 @@ const runId = Effect.gen(function* () {
   );
 });
 
-const complete = Effect.fn("Execution.complete")(function* <A, E>(
+const complete = Effect.fnUntraced(function* <A, E>(
   run: Execution["Service"],
   exit: Exit.Exit<A, E>,
 ) {
+  const span = yield* Effect.currentSpan.pipe(Effect.orDie);
   const event: Completion = {
     event: "execution.completed",
     runId: run.runId,
     operation: run.operation,
     status: status(exit),
     durationMs: (yield* Clock.currentTimeMillis) - run.started,
+    traceId: span.traceId,
+    spanId: span.spanId,
     ...(yield* Ref.get(run.details)),
+    ...MutableRef.get(run.logs),
     ...failure(exit),
   };
-  yield* Effect.logInfo(event);
+  const annotations = fields(yield* References.CurrentLogAnnotations);
+  yield* Effect.logInfo(event).pipe(
+    Effect.provideService(Logger.CurrentLoggers, run.sinks),
+    Effect.provideService(References.CurrentLogAnnotations, annotations),
+  );
 });
 
 export const withExecution = <A, E, R>(
@@ -49,14 +73,18 @@ export const withExecution = <A, E, R>(
 ): Effect.Effect<A, E, Exclude<R, Execution>> =>
   Effect.uninterruptibleMask((restore) =>
     Effect.gen(function* () {
+      const parent = yield* Effect.serviceOption(Execution);
       const run = Execution.of({
         runId: yield* runId,
         operation,
         started: yield* Clock.currentTimeMillis,
         details: yield* Ref.make<Details>({ steps: {} }),
+        logs: make(),
+        sinks: Option.isSome(parent) ? parent.value.sinks : yield* Logger.CurrentLoggers,
       });
       return yield* restore(effect).pipe(
         Effect.provideService(Execution, run),
+        Effect.provideService(Logger.CurrentLoggers, new Set([collector(run.logs)])),
         Effect.onExit((exit) => complete(run, exit)),
         Effect.annotateLogs({ runId: run.runId, operation }),
         Effect.withLogSpan("execution"),
@@ -111,7 +139,7 @@ const recordStep = Effect.fn("Execution.recordStep")(function* <A, E>(
     status: status(exit),
     durationMs: elapsed,
     ...failure(exit),
-  });
+  }).pipe(Effect.provideService(ProgressLog, true));
 });
 
 export const track = <A, E, R>(
@@ -120,6 +148,8 @@ export const track = <A, E, R>(
 ): Effect.Effect<A, E, R> =>
   Effect.gen(function* () {
     const started = yield* Clock.currentTimeMillis;
-    yield* Effect.logDebug({ event: "step.started", step });
+    yield* Effect.logDebug({ event: "step.started", step }).pipe(
+      Effect.provideService(ProgressLog, true),
+    );
     return yield* effect.pipe(Effect.onExit((exit) => recordStep(step, started, exit)));
   });

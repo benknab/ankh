@@ -1,5 +1,6 @@
 import { Cause, Exit, Option, Schema } from "effect";
 import { BackupError, type Action, type JobName } from "#domain/model.ts";
+import type { Messages } from "#telemetry/messages.ts";
 
 export type Operation = Action | "validate" | "proton-login";
 export type Step =
@@ -29,12 +30,14 @@ export interface Details {
   readonly steps: Partial<Readonly<Record<Step, StepSummary>>>;
 }
 
-export interface Completion extends Details {
+export interface Completion extends Details, Messages {
   readonly event: "execution.completed";
   readonly runId: string;
   readonly operation: Operation;
   readonly status: Status;
   readonly durationMs: number;
+  readonly traceId: string;
+  readonly spanId: string;
   readonly failure?: {
     readonly kind: "backup" | "failure" | "defect" | "interrupted";
     readonly exitCode?: number;
