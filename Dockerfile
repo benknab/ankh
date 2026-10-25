@@ -35,7 +35,7 @@ RUN wget --quiet --output-document=/usr/share/keyrings/postgresql.asc \
 
 WORKDIR /app
 
-RUN npm install --global pnpm@11.25.0
+RUN npm install --global pnpm@12.15.0
 
 # Test tooling stays in this opt-in image, not the production runner.
 FROM base AS test
