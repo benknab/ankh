@@ -1,13 +1,13 @@
 import { NodeRuntime } from "@effect/platform-node";
-import { Array, Console, Effect, Schema } from "effect";
+import { Array, Effect } from "effect";
 import { Argument, Command } from "effect/cli";
 import { Live } from "#app/layers.ts";
-import { AbsolutePath, Actions, BackupError } from "#domain/model.ts";
-import { runJob } from "#app/runner.ts";
+import { AbsolutePath, Actions } from "#domain/model.ts";
+import { runJob, validate } from "#app/runner.ts";
 import { login } from "#clients/proton/auth.ts";
 import { serve } from "#app/scheduler.ts";
-import { loadJob } from "#storage/storage.ts";
 import metadata from "#package" with { type: "json" };
+import { withExecution } from "#telemetry/execution.ts";
 
 const jobArgument = Argument.String("job-file").pipe(
   Argument.withDefault("/job/backup.job.json"),
@@ -34,14 +34,12 @@ const commands = Array.map(Actions, (action) =>
 const cli = Command.make("backup-runner").pipe(
   Command.withSubcommands([
     ...commands,
-    Command.make("validate", { job: jobArgument }, ({ job }) =>
-      loadJob(job).pipe(Effect.tap(() => Effect.logInfo("Job configuration is valid"))),
-    ).pipe(
+    Command.make("validate", { job: jobArgument }, ({ job }) => validate(job)).pipe(
       Command.withDescription(
         "Validate configuration without accessing backup mounts or credentials",
       ),
     ),
-    Command.make("proton-login", {}, () => login()).pipe(
+    Command.make("proton-login", {}, () => withExecution("proton-login", login())).pipe(
       Command.withDescription("Log in interactively and persist Proton credentials"),
     ),
     Command.make(
@@ -54,9 +52,6 @@ const cli = Command.make("backup-runner").pipe(
   ]),
   Command.run({ version: metadata.version }),
   Effect.provide(Live),
-  Effect.tapError((error) =>
-    Schema.is(BackupError)(error) ? Console.error(error.message) : Console.error(String(error)),
-  ),
 );
 
 if (import.meta.main) {

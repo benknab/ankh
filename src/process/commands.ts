@@ -2,6 +2,7 @@ import { Context, Effect, Layer } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { BackupError, backupError } from "#domain/model.ts";
 import { capture, redact, type CommandOutput, type Options } from "#process/output.ts";
+import { track } from "#telemetry/execution.ts";
 
 export type { CommandOutput, Options } from "#process/output.ts";
 
@@ -47,6 +48,7 @@ const run = Effect.fn("Commands.run")(
   },
   Effect.scoped,
   Effect.mapError(backupError("Command")),
+  (effect) => track("process", effect),
 );
 
 export class Commands extends Context.Service<

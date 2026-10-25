@@ -12,6 +12,7 @@ import { ProtonDrive } from "#clients/proton/client.ts";
 import { retainProton } from "#destinations/proton-retention.ts";
 import { parseSnapshotPairs } from "#domain/retention.ts";
 import type { Storage } from "#storage/storage.ts";
+import { track } from "#telemetry/execution.ts";
 
 const check = Effect.fn("Proton.check")(function* (job: Job, destination: Proton) {
   const outbox = yield* Outbox;
@@ -38,7 +39,7 @@ export const protonAdapter: DestinationAdapter<Proton, Outbox | ProtonDrive | St
       yield* proton.initialize(destination);
       if (request.action !== "init") {
         yield* outbox.drain(job, destination, (archive) => proton.upload(destination, archive));
-        yield* retainProton(job, destination);
+        yield* track("retention", retainProton(job, destination));
       }
     },
     Effect.mapError(backupError("Proton destination")),

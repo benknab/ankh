@@ -11,13 +11,14 @@ import {
 import { acknowledge, list } from "#outbox/files.ts";
 import { enqueue } from "#outbox/publish.ts";
 import type { Storage } from "#storage/storage.ts";
+import { track } from "#telemetry/execution.ts";
 
 const deliver = Effect.fn("Outbox.deliver")(function* (
   archive: Archive,
   upload: (archive: Archive) => Effect.Effect<void, BackupError>,
 ) {
   yield* (yield* ArchiveClient).verify(archive);
-  yield* upload(archive);
+  yield* track("upload", upload(archive));
   yield* acknowledge(archive);
 });
 

@@ -8,10 +8,7 @@ export const scheduledAttempts = <E, R>(
   schedule: JobSchedule = defaultSchedule,
 ): Effect.Effect<void, Cron.CronParseError, R> =>
   backup.pipe(
-    Effect.tap(() => Effect.logInfo("Scheduled backup completed")),
-    Effect.catch((error) =>
-      Effect.logError("Scheduled backup failed; pending uploads remain queued", error),
-    ),
+    Effect.ignore,
     Effect.schedule(Schedule.cron(schedule.cron, schedule.timeZone)),
     Effect.asVoid,
   );
@@ -19,7 +16,7 @@ export const scheduledAttempts = <E, R>(
 export const serve = Effect.fn("Scheduler.serve")(function* (file: AbsolutePath) {
   const job = yield* loadJob(file);
   const schedule = job.schedule ?? defaultSchedule;
-  yield* Effect.logInfo("Backup scheduler ready", {
+  yield* Effect.logDebug("Backup scheduler ready", {
     job: job.name,
     ...schedule,
   });

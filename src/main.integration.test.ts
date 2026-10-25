@@ -64,7 +64,21 @@ it.live("validate only reads the job file and rejects unknown fields", () =>
       file,
       yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(fixture),
     );
-    yield* commands.run(process.execPath, [entry, "validate", file]);
+    const validation = yield* commands.run(process.execPath, [entry, "validate", file]);
+    const line = yield* Schema.decodeEffect(
+      Schema.fromJsonString(
+        Schema.Struct({
+          message: Schema.Struct({
+            event: Schema.Literal("execution.completed"),
+            status: Schema.Literal("success"),
+            operation: Schema.Literal("validate"),
+            runId: Schema.NonEmptyString,
+          }),
+          annotations: Schema.Struct({ runId: Schema.NonEmptyString }),
+        }),
+      ),
+    )(validation.stdout);
+    expect(line.message.runId).toBe(line.annotations.runId);
     yield* fs.writeFileString(
       file,
       yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({

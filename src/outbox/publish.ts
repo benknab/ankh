@@ -9,6 +9,7 @@ import {
   type Proton,
 } from "#domain/model.ts";
 import { privateDirectory, Storage } from "#storage/storage.ts";
+import { track } from "#telemetry/execution.ts";
 
 const publish = Effect.fn("Outbox.publish")(function* (
   stage: AbsolutePath,
@@ -16,7 +17,7 @@ const publish = Effect.fn("Outbox.publish")(function* (
   ready: string,
 ) {
   const { fs } = yield* Storage;
-  yield* (yield* ArchiveClient).create(stage, archive);
+  yield* track("archive", (yield* ArchiveClient).create(stage, archive));
   if (yield* fs.exists(ready)) {
     return yield* BackupError.make({ message: `Archive already exists: ${ready}` });
   }

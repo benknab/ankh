@@ -44,6 +44,9 @@ Do not use v3 examples or a separate copy of Effect documentation.
 - Use `#` imports for local modules and Vitest `expect` matchers in tests.
 - Put typed tool clients in `src/clients/`. Source and destination adapters
   implement the contracts in `src/domain/adapters.ts`.
+- Start execution telemetry at command and scheduled-attempt boundaries. Emit
+  one completion event after cleanup. Keep credentials, arguments, tool output,
+  and raw errors out of logs. Use debug events for step progress.
 - Write Effect tests with `it.effect` from `@effect/vitest`; use `it.live` for
   real subprocess and integration tests. Both manage the test scope. Use the
   provided `TestClock` in `it.effect` rather than starting a separate runtime.

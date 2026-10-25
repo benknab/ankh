@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { Array, Effect, HashSet, Layer, Option, Ref, Result, Schema } from "effect";
+import { Array, Effect, HashSet, Layer, Logger, Option, Ref, Result, Schema } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { Commands } from "#process/commands.ts";
 import { Destinations } from "#destinations/destinations.ts";
@@ -76,8 +76,14 @@ it.live("real SQLite and Restic survive Proton failure, then retry and restore b
     const adapters = Layer.mergeAll(Sources.layer, Destinations.layer).pipe(
       Layer.provideMerge(dependencies),
     );
+    const messages: unknown[] = [];
+    const logger = Logger.layer([
+      Logger.make(({ message }: Logger.Options<unknown>): void => {
+        messages.push(message);
+      }),
+    ]);
     const run = Effect.fn("Test.run")((action: "init" | "backup" | "retry") =>
-      runJob(jobFile, action).pipe(Effect.provide(adapters)),
+      runJob(jobFile, action).pipe(Effect.provide(Layer.merge(adapters, logger))),
     );
     yield* run("init");
     const failed = yield* run("backup").pipe(Effect.result);
@@ -89,6 +95,34 @@ it.live("real SQLite and Restic survive Proton failure, then retry and restore b
     // A retry must not depend on the source still being available.
     yield* fs.remove(source);
     yield* run("retry");
+    const events = yield* Schema.decodeUnknownEffect(
+      Schema.Array(
+        Schema.Tuple([
+          Schema.Struct({
+            event: Schema.Literal("execution.completed"),
+            operation: Schema.String,
+            status: Schema.String,
+            steps: Schema.Record(
+              Schema.String,
+              Schema.Struct({ attempts: Schema.Int, failures: Schema.Int }),
+            ),
+          }),
+        ]),
+      ),
+    )(messages);
+    expect(Array.map(events, ([event]) => [event.operation, event.status])).toStrictEqual([
+      ["init", "success"],
+      ["backup", "failure"],
+      ["retry", "success"],
+    ]);
+    expect(events[1]?.[0].steps).toMatchObject({
+      source: { attempts: 1, failures: 0 },
+      restic: { failures: 0 },
+      "proton-drive": { failures: 1 },
+      cleanup: { failures: 0 },
+    });
+    expect(events[1]?.[0].steps.process?.attempts).toBeGreaterThan(0);
+    expect(events[2]?.[0].steps.source).toBeUndefined();
     expect(
       yield* fs.readDirectory(path.join(root, "outbox")),
       "retry should acknowledge the pending pair",

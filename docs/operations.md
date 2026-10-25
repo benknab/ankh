@@ -84,9 +84,23 @@ The root `compose.yaml` is an optional login helper using the external
 expiry or revocation, rerun login with that volume, then run `retry` and a restore
 check. Authentication or network errors during discovery do not create folders.
 
-Ordinary command diagnostics retain a bounded tail; parser output has a 16 MiB
-text capture limit. Errors keep their operation and exit code internally, while
-CLI messages redact supplied password/token values and avoid dumping causes.
+## Logs
+
+The default info layer writes one JSON completion line for each command or
+scheduled backup. The event is in `message`, with `event: execution.completed`.
+It contains `runId`, `operation`, `status`, `durationMs`, job/source details when
+known, and step summaries. Each step records attempts, failures, interruptions,
+and elapsed time. `restic` and `proton-drive` are separate destination steps.
+
+Set `BACKUP_LOG_LEVEL=debug` in the container to add step start/end events.
+All events in one run have the same `annotations.runId`. Each scheduled attempt
+gets a new ID. Concurrent runs have separate counters. Cleanup finishes before
+the completion event. A forced kill or power loss cannot emit a completion event.
+
+Failure fields contain a safe category and an exit code when available. Logs omit
+arguments, credentials, tool output, and raw error causes. Interactive Proton login
+still displays the official CLI prompts. Command results keep bounded diagnostics
+internally: a 64 KiB tail, or up to 16 MiB of text for output that clients parse.
 
 ## Verification scope
 

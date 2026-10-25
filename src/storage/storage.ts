@@ -77,7 +77,7 @@ export const withLock = Effect.fn("withLock")(function* (job: Job) {
     }
   }).pipe(Effect.uninterruptible, Effect.mapError(backupError("Drive lock cleanup")));
   yield* Effect.acquireRelease(fs.makeDirectory(directory, { mode: 0o700 }), () =>
-    release.pipe(Effect.catch((error) => Effect.logError(error.message))),
+    release.pipe(Effect.catch(() => Effect.logDebug({ event: "lock.cleanup.failed" }))),
   ).pipe(
     Effect.retry({
       schedule: Schedule.spaced("10 seconds"),
