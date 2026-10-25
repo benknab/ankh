@@ -132,8 +132,64 @@ docker compose -f examples/compose.yaml -f examples/compose.proton.yaml run --rm
 docker compose -f examples/compose.yaml -f examples/compose.proton.yaml run --rm backup backup
 ```
 
-Login is interactive. Subsequent commands use the credentials stored in the
-volume. The volume name can be changed with `PROTON_STATE_VOLUME`.
+Login prints a sign-in URL and waits up to 10 minutes for it to complete.
+Subsequent commands use the credentials stored in the volume. The volume name can
+be changed with `PROTON_STATE_VOLUME`.
+
+To require a passphrase for the stored credentials, write it as one line to
+`SECRETS_DIR/proton-gpg-passphrase` before logging in, or add it later and log in
+again. Every container that uses the volume then needs the same file. See
+[Security](#security) for what this protects.
+
+## Security
+
+Proton publishes a Drive SDK, but not its sign-in and session handling, so Ankh
+runs the official Proton Drive CLI as an external tool rather than reimplementing
+Proton's authentication. The CLI is designed for interactive use. Running it
+unattended has these consequences.
+
+**The Proton state volume is an account credential.** To run without a person
+present, the CLI stores the session tokens and the key password that unlocks the
+account's private keys. Anyone who can read the volume can act as the account and
+decrypt its data, not only Drive. Use a Proton account dedicated to backups.
+
+**The passphrase file separates that credential into two parts.** The session is
+stored in `pass`, encrypted with a GPG key kept in the same volume. Without
+`proton-gpg-passphrase`, the key has no passphrase, and a copy of the volume is
+enough to read the session. With it, decryption also needs the read-only secrets
+mount. This does not protect a running container or a host that can read both.
+`proton-login` adds the passphrase to an existing key and never removes one.
+Proton runs fail if the file is missing for a protected key, or if the file was
+added without logging in again.
+
+Ankh works around the CLI's limits as follows:
+
+- **One CLI process at a time.** The CLI has no lock between processes and
+  rewrites the stored session after each token refresh; a failed refresh signs it
+  out. Every `proton-drive`, `gpg`, and `pass` call, including those made by
+  `proton-login`, holds an exclusive `flock` on `/proton/lock` across all
+  containers that share the volume. A call waits up to six hours for the lock.
+- **Credential checks before network access.** Login checks the key, the `pass`
+  recipient, and an encrypt and decrypt round trip before the browser sign-in, so
+  a broken store cannot strand a new session. Each Proton destination run checks
+  that the key's protection matches the passphrase file.
+- **A pinned environment.** Ankh sets the CLI's API host, credential store, cache
+  encryption, and `pass` options, so container variables cannot change them.
+- **Fixed failure reasons.** Tool output stays out of logs. Known CLI failures,
+  such as a missing or revoked session, are logged as fixed messages that name
+  the fix.
+
+Some limits need manual steps:
+
+- Logging in again does not revoke the previous session; the CLI's logout only
+  deletes local data. Revoke old sessions in the Proton account's security
+  settings.
+- Whoever completes the printed sign-in URL first decides which account Ankh
+  uses. Run the login with `--rm` so Docker does not keep its output, and check
+  the account's session list after signing in.
+- The containers run as root with only the `DAC_OVERRIDE` capability, which lets
+  them read bind mounts owned by other users. A non-root user would require
+  changing the ownership of every mount.
 
 ## Development
 
