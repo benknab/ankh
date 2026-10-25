@@ -1,7 +1,7 @@
 # Releases
 
 The `Checks` workflow installs frozen dependencies, checks formatting/lint/types,
-runs unit and container integration tests, scans Git history, and completes the
+runs unit and container integration tests, audits dependencies, scans Git history, and completes the
 production-image quickstart restore. Pull requests use read-only permissions.
 Actions and external images are pinned to commits or digests.
 

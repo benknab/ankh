@@ -3,6 +3,8 @@ minimumReleaseAgeExclude:
 overrides:
   # Adapter 4.0.3 requires unpublished effect@4.0.3; keep the compatible stable pair.
   "@effect/platform-node-shared": 4.0.2
+  # Patched transport for the platform-node dependency's security advisories.
+  undici: 8.12.2
   vite: npm:@voidzero-dev/vite-plus-core@1.3.0
   vitest: 5.0.5
 peerDependencyRules:

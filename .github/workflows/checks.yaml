@@ -27,6 +27,7 @@ jobs:
           npm install --global "$(node -p "require('./package.json').packageManager")"
           pnpm install --frozen-lockfile
       - run: pnpm check
+      - run: pnpm audit
       - run: pnpm test
       - name: Validate workflow definitions
         run: >-
