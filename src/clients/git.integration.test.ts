@@ -39,5 +39,15 @@ it.live("an existing mirror switches to the requested origin", () =>
       const result = yield* commands.run("git", ["-C", mirror, "show", "refs/heads/main:value"]);
       expect(Redacted.value(result.stdout)).toBe(name);
     }
+    const origin = path.join(root, "second");
+    yield* commands.run("git", ["-C", origin, "branch", "-m", "main", "renamed"]);
+    yield* client.mirror({
+      url: origin,
+      mirror,
+      tokenFile: absolutePath(path.join(root, "token")),
+    });
+    const restored = path.join(root, "restored");
+    yield* commands.run("git", ["clone", mirror, restored]);
+    expect(yield* fs.readFileString(path.join(restored, "value"))).toBe("second");
   }).pipe(Effect.provide(GitClient.layer.pipe(Layer.provideMerge(infrastructure)))),
 );

@@ -1,4 +1,4 @@
-import { Context, Effect, Layer } from "effect";
+import { Array, Context, Effect, Layer, Option, Redacted, Schema } from "effect";
 import { type AbsolutePath, backupError, type BackupError } from "#domain/model.ts";
 import { Commands, type Options } from "#process/commands.ts";
 import { privateDirectory, Storage } from "#storage/storage.ts";
@@ -8,6 +8,27 @@ export interface GitRepository {
   readonly mirror: string;
   readonly tokenFile: AbsolutePath;
 }
+
+const syncHead = Effect.fn("GitClient.syncHead")(function* (
+  repository: GitRepository,
+  options: Options,
+) {
+  const commands = yield* Commands;
+  const result = yield* commands.run(
+    "git",
+    ["-C", repository.mirror, "ls-remote", "--symref", "origin", "HEAD"],
+    options,
+  );
+  const row = Array.findFirst(Redacted.value(result.stdout).split("\n"), (line) =>
+    line.startsWith("ref: "),
+  );
+  if (Option.isSome(row)) {
+    const ref = yield* Schema.decodeUnknownEffect(
+      Schema.String.check(Schema.isPattern(/^refs\/heads\/[^\s]+$/u)),
+    )(row.value.slice(5).split("\t")[0]);
+    yield* commands.run("git", ["-C", repository.mirror, "symbolic-ref", "HEAD", ref], options);
+  }
+});
 
 export class GitClient extends Context.Service<
   GitClient,
@@ -57,6 +78,7 @@ export class GitClient extends Context.Service<
             options,
           );
           yield* commands.run("git", ["-C", repository.mirror, "fsck", "--full"], options);
+          yield* syncHead(repository, options).pipe(Effect.provideService(Commands, commands));
         },
         Effect.mapError(backupError("Git mirror")),
       );
