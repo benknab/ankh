@@ -249,3 +249,119 @@ it.effect("Proton trash can resume a known partial deletion", () =>
     expect(HashSet.size(yield* Ref.get(remaining)), "remaining checksum must be removed").toBe(0);
   }),
 );
+
+it.effect("Proton retention uses two listings and bounded batches for a large deletion", () =>
+  Effect.gen(function* () {
+    const destination = yield* destinationConfig;
+    const job = yield* Schema.decodeEffect(JobName)("test-job");
+    const names = HashSet.fromIterable(
+      Array.makeBy(120, (day) =>
+        archiveName(job, DateTime.add(DateTime.makeUnsafe("2025-01-01T00:00:00Z"), { days: day })),
+      ),
+    );
+    let remaining = HashSet.add(
+      HashSet.fromIterable(
+        Array.flatMap(Array.fromIterable(names), (name) => [name, `${name}.sha256`]),
+      ),
+      "unrelated.txt",
+    );
+    let lists = 0;
+    const batches: number[] = [];
+    const commands = Commands.of({
+      run: (_binary, args) =>
+        Effect.gen(function* () {
+          if (args.includes("trash")) {
+            const files = Array.map(args.slice(args.indexOf("--json") + 1), (arg) =>
+              Redacted.isRedacted(arg) ? Redacted.value(arg) : arg,
+            );
+            batches.push(files.length);
+            for (const file of files) {
+              remaining = HashSet.remove(
+                remaining,
+                file.slice(destination.remoteFolder.length + 1),
+              );
+            }
+            return output("[]");
+          }
+          lists += 1;
+          return output(yield* listing(remaining));
+        }),
+    });
+    yield* Effect.gen(function* () {
+      yield* (yield* ProtonDrive).trash(destination, names);
+    }).pipe(Effect.provide(protonLayer(commands)));
+    expect(lists).toBe(2);
+    expect(batches).toEqual([100, 100, 40]);
+    expect(Array.fromIterable(remaining)).toEqual(["unrelated.txt"]);
+  }),
+);
+
+it.effect("Proton retention retries a failed batch without retrashing removed files", () =>
+  Effect.gen(function* () {
+    const destination = yield* destinationConfig;
+    const job = yield* Schema.decodeEffect(JobName)("test-job");
+    const names = HashSet.fromIterable(
+      Array.makeBy(51, (day) =>
+        archiveName(job, DateTime.add(DateTime.makeUnsafe("2025-01-01T00:00:00Z"), { days: day })),
+      ),
+    );
+    let remaining = HashSet.fromIterable(
+      Array.flatMap(Array.fromIterable(names), (name) => [name, `${name}.sha256`]),
+    );
+    let batches = 0;
+    const commands = Commands.of({
+      run: (_binary, args) =>
+        Effect.gen(function* () {
+          if (!args.includes("trash")) {
+            return output(yield* listing(remaining));
+          }
+          batches += 1;
+          if (batches === 2) {
+            return yield* BackupError.make({ message: "injected batch failure" });
+          }
+          for (const arg of args.slice(args.indexOf("--json") + 1)) {
+            const file = (Redacted.isRedacted(arg) ? Redacted.value(arg) : arg).slice(
+              destination.remoteFolder.length + 1,
+            );
+            expect(HashSet.has(remaining, file), "retry must skip files already removed").toBe(
+              true,
+            );
+            remaining = HashSet.remove(remaining, file);
+          }
+          return output("[]");
+        }),
+    });
+    yield* Effect.gen(function* () {
+      const proton = yield* ProtonDrive;
+      const failure = yield* proton.trash(destination, names).pipe(Effect.flip);
+      expect(failure.message).toBe("injected batch failure");
+      expect(HashSet.size(remaining)).toBe(2);
+      yield* proton.trash(destination, names);
+    }).pipe(Effect.provide(protonLayer(commands)));
+    expect(batches).toBe(3);
+    expect(HashSet.size(remaining)).toBe(0);
+  }),
+);
+
+it.effect("Proton retention rejects a successful trash command that leaves a checksum", () =>
+  Effect.gen(function* () {
+    const destination = yield* destinationConfig;
+    const name = yield* archive;
+    let trashed = false;
+    const commands = Commands.of({
+      run: (_binary, args) =>
+        Effect.gen(function* () {
+          if (args.includes("trash")) {
+            trashed = true;
+            return output("[]");
+          }
+          return output(yield* listing(trashed ? [`${name}.sha256`] : [name, `${name}.sha256`]));
+        }),
+    });
+    const failure = yield* Effect.gen(function* () {
+      yield* (yield* ProtonDrive).trash(destination, HashSet.make(name));
+    }).pipe(Effect.provide(protonLayer(commands)), Effect.flip);
+    expect(trashed).toBe(true);
+    expect(failure.message).toBe(`Proton did not confirm trashing ${name}`);
+  }),
+);

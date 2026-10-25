@@ -33,20 +33,38 @@ const upload = Effect.fn("ProtonDrive.upload")(function* (
   }
 });
 
-const trashPair = Effect.fn("ProtonDrive.trashPair")(function* (
+const trashBatch = Effect.fn("ProtonDrive.trashBatch")(function* (
   cli: ProtonCli["Service"],
   destination: Folder,
-  name: ArchiveName,
+  pending: readonly string[],
 ) {
-  const pair = [name, `${name}.sha256`];
-  const existing = yield* cli.list(destination.remoteFolder, "file");
-  const pending = Array.filter(pair, (file) => HashSet.has(existing, file));
   if (pending.length > 0) {
     yield* cli.trash(Array.map(pending, (file) => `${destination.remoteFolder}/${file}`));
   }
+});
+
+const trash = Effect.fn("ProtonDrive.trash")(function* (
+  cli: ProtonCli["Service"],
+  destination: Folder,
+  names: HashSet.HashSet<ArchiveName>,
+) {
+  if (HashSet.size(names) === 0) {
+    return;
+  }
+  const existing = yield* cli.list(destination.remoteFolder, "file");
+  // Bound command arguments while sharing folder listings across the whole retention intent.
+  for (const batch of Array.chunksOf(Array.fromIterable(names), 50)) {
+    const pending = Array.filter(
+      Array.flatMap(batch, (name) => [name, `${name}.sha256`]),
+      (file) => HashSet.has(existing, file),
+    );
+    yield* trashBatch(cli, destination, pending);
+  }
   const remaining = yield* cli.list(destination.remoteFolder, "file");
-  if (Array.some(pair, (file) => HashSet.has(remaining, file))) {
-    return yield* BackupError.make({ message: `Proton did not confirm trashing ${name}` });
+  for (const name of names) {
+    if (HashSet.has(remaining, name) || HashSet.has(remaining, `${name}.sha256`)) {
+      return yield* BackupError.make({ message: `Proton did not confirm trashing ${name}` });
+    }
   }
 });
 
@@ -72,8 +90,7 @@ export class ProtonDrive extends Context.Service<
         initialize: (destination) => initialize(cli, destination),
         list: (destination) => cli.list(destination.remoteFolder, "file"),
         upload: (destination, archive) => upload(cli, destination, archive),
-        trash: (destination, names) =>
-          Effect.forEach(names, (name) => trashPair(cli, destination, name), { discard: true }),
+        trash: (destination, names) => trash(cli, destination, names),
       });
     }),
   ).pipe(Layer.provide(ProtonCli.layer));
