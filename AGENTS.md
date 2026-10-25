@@ -1,8 +1,8 @@
 # Backup runner
 
 This is a standalone Node.js project using pnpm, Vite+, and stable Effect.
-Use the versions in `.node-version` and `package.json`. Run project commands here;
-run formatting from the deployment root.
+Use the versions in `.node-version` and `package.json`. Run project commands from
+this repository's root.
 
 ## Effect documentation
 
@@ -15,9 +15,8 @@ Do not use v3 examples or a separate copy of Effect documentation.
 
 ## Implementation
 
-- Use only Effect libraries for application infrastructure. This project's
-  Effect error channel replaces the repository's default `better-result`
-  convention.
+- Use only Effect libraries for application infrastructure and the Effect error
+  channel for failures.
 - Use Schema for configuration and external data, Context.Service and Layer for
   dependencies, Effect.fn for operations, and tagged errors for failures.
 - Carry strong input types past the boundary: branded names and paths, HashSet
@@ -46,9 +45,9 @@ Run `pnpm check` and `pnpm test`. Vite+ runs Oxlint and Vitest;
 TypeScript checks source, tests, and tool config. The official `@effect/tsgo`
 recommended preset runs Effect rules through Oxlint. `prepare` patches only
 Oxlint and its type-aware runner; keep TypeScript unpatched. Keep Vite+ settings in
-`vite.config.ts`. Run `pnpm fmt backup-runner` or
-`pnpm fmt:check backup-runner` from the deployment root using its single Oxfmt
-config. Do not add a local formatter dependency, config, or script.
+`vite.config.ts`. Use the formatter bundled with Vite+: `pnpm exec vp fmt <paths>`
+to format changed files, or add `--check` to check them. Keep formatting scoped to
+the files being changed.
 
 Build the container and its `test` target, then run its integration tests when changing process or filesystem
 behavior. Test scheduling with Effect's TestClock, including timezone handling

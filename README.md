@@ -1,11 +1,17 @@
 # Backup runner
 
-A standalone Node.js project using pnpm, Vite+, and stable Effect.
-Use the versions in `.node-version` and `package.json`. Each opted-in app
+A container-first backup runner for SQLite, PostgreSQL, and Gitea Git/LFS. It stores
+encrypted local snapshots with Restic and portable archives on Proton Drive.
+
+The project uses Node.js, pnpm, Vite+, and stable Effect. Use the versions in
+`.node-version` and `package.json`. Each opted-in app
 owns its Compose backup service, source mounts, and job file. The runner stages
 and checks the source once, then attempts every configured destination. A failed
 destination fails the job while preserving successful copies and pending
 uploads.
+
+The container currently targets Linux/amd64. Its Proton CLI executable is x64;
+native macOS, Windows, and ARM container operation are not supported configurations.
 
 Keep the Node platform packages compatible with Effect. See `pnpm-workspace.yaml`
 for the shared adapter override and its reason.
@@ -35,7 +41,7 @@ skill bundled in `node_modules/effect/`.
 
 ## Development
 
-Run these commands from `backup-runner/`:
+Run these commands from the repository root:
 
 ```sh
 pnpm install --frozen-lockfile
@@ -49,9 +55,8 @@ Node runs TypeScript directly, without a build step. `pnpm check` runs Vite+
 Oxlint, including the recommended Effect rules, and TypeScript; `pnpm test` runs
 Vite+ Vitest. Installation patches Oxlint through `@effect/tsgo`, not TypeScript.
 Run `pnpm prepare` if you install with scripts disabled. Tests and configuration use
-the same strict type checks as the source. Format only from the deployment root with
-`pnpm fmt backup-runner` or `pnpm fmt:check backup-runner`; use its single root
-Oxfmt config and installation.
+the same strict type checks as the source. Format changed files with
+`pnpm exec vp fmt <paths>`, or add `--check` to check their formatting.
 
 Tests load the Vite+ config with Node's native TypeScript support. The integration
 command also disables Vitest's disk cache so it can run in a read-only container.
@@ -87,7 +92,7 @@ that wrong credentials fail without exposing the password.
 ## PostgreSQL sources
 
 Use source type `postgres` with `hostname`, `port`, `database`, `username`,
-`passwordFile`, and `output` (see `../server/example-postgres/backup.job.json`). The
+`passwordFile`, and `output` (see the job schema in `src/model.ts`). The
 password file contains the password with an optional trailing newline. The
 runner passes connection details through the dump process environment, never
 command arguments. It creates a consistent custom-format dump while the app runs
@@ -95,8 +100,8 @@ and checks every archive entry with `pg_restore --file=/dev/null`. This checks
 readability, not whether a database restore succeeds; test restores separately.
 
 The image installs PostgreSQL 15 clients from the signed PostgreSQL apt
-repository to match Example PostgreSQL's server. Revisit the client major version before
-upgrading that server. Dumps include database objects and data, not cluster
+repository. PostgreSQL 15 clients cannot dump a newer-major server; check client
+compatibility before upgrading your server. Dumps include database objects and data, not cluster
 roles or app secrets. Keep recovery copies of those separately.
 
 ## Setup
@@ -134,7 +139,7 @@ App stack teardown does not delete this external volume.
 
 ## Operations
 
-Run these from an opted-in app directory, such as `server/example-app/`:
+Run these from an application Compose directory with a configured `backup` service:
 
 ```sh
 docker compose run --no-deps --rm backup init
@@ -161,7 +166,7 @@ removes a pair only after Proton confirms both remote filenames. Legacy flat
 outbox pairs are also retried. Interrupted `.partial-*` directories are ignored
 and can be removed when no run is active.
 
-Both destinations use 14 daily, 8 weekly, 12 monthly, and 5 yearly retention.
+Each job sets its daily, weekly, monthly, and yearly retention counts explicitly.
 Proton keeps the newest snapshot in each retained UTC period, with Monday-start
 weeks, and moves expired pairs for this job to trash. It never empties account
 trash; trashed data may still consume quota. Restic applies its native retention
@@ -189,8 +194,8 @@ mirrors remain available when a repository disappears from the API.
 Each enabled app's `backup` service runs `backup-runner schedule` continuously.
 Effect's `Schedule.cron` triggers the job daily at **03:30 UTC**,
 without a daylight-saving offset. A normal `docker compose up -d`
-starts the scheduler alongside the app, except for opt-in profiles such as
-Example PostgreSQL's `backup` profile. Follow that app's restore checks before enabling it.
+starts the scheduler alongside the app unless the backup service uses an opt-in
+profile. Complete the app's restore checks before enabling its scheduler.
 To start only the backup service after setup:
 
 ```sh
@@ -208,3 +213,8 @@ The scheduler waits until the next scheduled time on startup. It does not replay
 missed runs after downtime; use the manual `backup` command if needed. Docker's
 `restart: unless-stopped` brings the scheduler back after a reboot. No host
 timer, cron daemon, or Docker socket is needed.
+
+## License
+
+[MIT](LICENSE), copyright 2026 benknab. External tools and dependencies retain
+their own licenses.
