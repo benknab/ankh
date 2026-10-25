@@ -12,6 +12,8 @@ services:
     platform: linux/amd64
     command: ["proton-login"]
     read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     tmpfs: ["/tmp:size=64m,mode=1777"]
     volumes: ["proton-state:/proton"]
 volumes:
