@@ -81,12 +81,12 @@ Run integration tests when changing process or filesystem behavior. Test schedul
 with Effect's TestClock, including timezone handling and failure recovery. Enable
 scheduled services only after real backups and restores pass for every opted-in app.
 
-## Release checks
+## Container checks
 
 Keep the production image in the root Dockerfile and the integration image in
 `tests/Dockerfile`. Run `bash tools/quickstart.sh` after changing container setup or
 examples; it verifies a real backup and restore using the production image.
 Keep the build-context allowlist free of credentials and deployment settings.
-Read `docs/releases.md` before publishing. Tags and released image versions are
-immutable; release notes must identify the source commit and anonymously verified
-image digest. Real Proton account tests remain separate from credential-free CI.
+CI only runs verification and tests. Do not create releases, version tags, or
+publish images without an explicit request. Real Proton account tests remain
+separate from credential-free CI.

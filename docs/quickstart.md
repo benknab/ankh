@@ -56,9 +56,8 @@ docker compose -f examples/compose.yaml run --rm backup backup
 docker compose -f examples/compose.yaml run --rm backup check-read-data
 ```
 
-Perform an actual [restore](restores.md) before scheduling. To use a released
-image, set `BACKUP_RUNNER_IMAGE` to the release's `tag@sha256:digest`, run
-`docker compose -f examples/compose.yaml pull backup`, and omit the build command.
+Perform an actual [restore](restores.md) before scheduling. The commands above
+build the image locally from your checkout.
 
 ## Add Proton Drive
 

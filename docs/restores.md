@@ -48,7 +48,7 @@ docker run --rm --platform linux/amd64 \
 
 Replace `ARCHIVE` with the actual job/timestamp name from `filesystem list` or the
 Drive UI. Download to an empty directory to avoid interactive conflict handling.
-Use the release image reference instead of `backup-runner:local` when applicable.
+Use the same locally built image as the backup job.
 
 ```sh
 docker run --rm --platform linux/amd64 -v /path/to/download:/restore \
