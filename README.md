@@ -152,15 +152,20 @@ unattended has these consequences.
 present, the CLI stores the session tokens and the key password that unlocks the
 account's private keys. Anyone who can read the volume can act as the account and
 decrypt its data, not only Drive. Use a Proton account dedicated to backups.
+Write access is equivalent to running code in Ankh's containers, because GnuPG,
+`pass`, and the CLI read their configuration from the volume. Mount it only in
+Ankh containers.
 
 **The passphrase file separates that credential into two parts.** The session is
 stored in `pass`, encrypted with a GPG key kept in the same volume. Without
 `proton-gpg-passphrase`, the key has no passphrase, and a copy of the volume is
 enough to read the session. With it, decryption also needs the read-only secrets
 mount. This does not protect a running container or a host that can read both.
-`proton-login` adds the passphrase to an existing key and never removes one.
-Proton runs fail if the file is missing for a protected key, or if the file was
-added without logging in again.
+The GPG agent, whose socket is in the volume, is configured not to cache the
+passphrase. `proton-login` adds the passphrase to an existing key and never
+removes one. Proton runs fail if the file is missing for a protected key, or if
+the file was added without logging in again. Changing the passphrase requires
+removing `/proton/gnupg` and `/proton/pass` and logging in again.
 
 Ankh works around the CLI's limits as follows:
 
@@ -170,11 +175,14 @@ Ankh works around the CLI's limits as follows:
   `proton-login`, holds an exclusive `flock` on `/proton/lock` across all
   containers that share the volume. A call waits up to six hours for the lock.
 - **Credential checks before network access.** Login checks the key, the `pass`
-  recipient, and an encrypt and decrypt round trip before the browser sign-in, so
-  a broken store cannot strand a new session. Each Proton destination run checks
-  that the key's protection matches the passphrase file.
+  recipients, including those in the CLI's session folder, and an encrypt and
+  decrypt round trip there before the browser sign-in, so a broken store cannot
+  strand a new session. Each Proton destination run checks the key, its
+  protection, and the recipients.
 - **A pinned environment.** Ankh sets the CLI's API host, credential store, cache
-  encryption, and `pass` options, so container variables cannot change them.
+  encryption, and `pass` options, so a stray container variable cannot change
+  them. This is not a boundary against someone who controls the container
+  environment.
 - **Fixed failure reasons.** Tool output stays out of logs. Known CLI failures,
   such as a missing or revoked session, are logged as fixed messages that name
   the fix.
@@ -185,8 +193,11 @@ Some limits need manual steps:
   deletes local data. Revoke old sessions in the Proton account's security
   settings.
 - Whoever completes the printed sign-in URL first decides which account Ankh
-  uses. Run the login with `--rm` so Docker does not keep its output, and check
-  the account's session list after signing in.
+  uses, and the URL also carries the key for the session handoff. The login
+  services disable Docker logging; keep the terminal output private as well, and
+  check the account's session list after signing in.
+- The CLI writes its own warning log to `/proton/cache`. It can send crash
+  reports to Proton, and sends metrics when the account has telemetry enabled.
 - The containers run as root with only the `DAC_OVERRIDE` capability, which lets
   them read bind mounts owned by other users. A non-root user would require
   changing the ownership of every mount.
