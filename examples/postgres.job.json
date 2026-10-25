@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "name": "example-postgres",
+  "host": "example-host",
+  "source": {
+    "type": "postgres",
+    "hostname": "postgres",
+    "port": 5432,
+    "database": "example",
+    "username": "backup",
+    "passwordFile": "/secrets/postgres-password",
+    "output": "database.dump"
+  },
+  "backupDrive": {
+    "sentinelFile": "/backups/.sentinel",
+    "driveSerial": "example-drive",
+    "filesystemUuid": "example-filesystem"
+  },
+  "destinations": [
+    {
+      "type": "restic",
+      "repository": "/backups/restic",
+      "passwordFile": "/secrets/restic-password"
+    }
+  ],
+  "retention": { "daily": 14, "weekly": 8, "monthly": 12, "yearly": 5 },
+  "schedule": { "cron": "30 3 * * *", "timeZone": "UTC" }
+}

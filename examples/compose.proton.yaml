@@ -1,0 +1,20 @@
+services:
+  backup:
+    volumes:
+      - type: bind
+        source: ./sqlite-proton.job.json
+        target: /job/backup.job.json
+        read_only: true
+        bind: { create_host_path: false }
+      - proton-state:/proton
+  proton-auth:
+    image: ${BACKUP_RUNNER_IMAGE:-backup-runner:local}
+    platform: linux/amd64
+    command: ["proton-login"]
+    read_only: true
+    tmpfs: ["/tmp:size=64m,mode=1777"]
+    volumes: ["proton-state:/proton"]
+volumes:
+  proton-state:
+    name: ${PROTON_STATE_VOLUME:-backup-proton-state}
+    external: true

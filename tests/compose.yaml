@@ -3,6 +3,7 @@ services:
     build:
       context: ..
       target: base
+      platforms: [linux/amd64]
     platform: linux/amd64
 
   postgres-test:
@@ -22,6 +23,7 @@ services:
     build:
       context: ..
       dockerfile: tests/Dockerfile
+      platforms: [linux/amd64]
       additional_contexts:
         backup-runner-toolchain: service:toolchain
     platform: linux/amd64

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "name": "example-job",
+  "host": "example-host",
+  "source": { "type": "sqlite", "path": "/source/example.db", "output": "example.db" },
+  "backupDrive": {
+    "sentinelFile": "/backups/.sentinel",
+    "driveSerial": "example-drive",
+    "filesystemUuid": "example-filesystem"
+  },
+  "destinations": [
+    {
+      "type": "restic",
+      "repository": "/backups/restic",
+      "passwordFile": "/secrets/restic-password"
+    }
+  ],
+  "retention": { "daily": 14, "weekly": 8, "monthly": 12, "yearly": 5 },
+  "schedule": { "cron": "30 3 * * *", "timeZone": "UTC" }
+}

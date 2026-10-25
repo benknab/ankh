@@ -1,0 +1,36 @@
+services:
+  backup:
+    image: ${BACKUP_RUNNER_IMAGE:-backup-runner:local}
+    build:
+      context: ..
+    platform: linux/amd64
+    command: ["backup"]
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [DAC_OVERRIDE]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: ["/tmp:size=256m,mode=1777"]
+    volumes:
+      - type: bind
+        source: ${JOB_FILE:-./sqlite-restic.job.json}
+        target: /job/backup.job.json
+        read_only: true
+        bind: { create_host_path: false }
+      - type: bind
+        source: ${SOURCE_DIR:?Set SOURCE_DIR to an existing source directory}
+        target: /source
+        read_only: true
+        bind: { create_host_path: false }
+      - type: bind
+        source: ${BACKUP_DIR:?Set BACKUP_DIR to the mounted backup directory}
+        target: /backups
+        bind: { create_host_path: false }
+      - type: bind
+        source: ${SECRETS_DIR:?Set SECRETS_DIR to an existing secrets directory}
+        target: /secrets
+        read_only: true
+        bind: { create_host_path: false }
+      - type: bind
+        source: ${STAGING_DIR:?Set STAGING_DIR to a private staging directory}
+        target: /staging
+        bind: { create_host_path: false }
