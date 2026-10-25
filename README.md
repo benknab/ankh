@@ -51,12 +51,15 @@ pnpm start --help
 docker build -t backup-runner:local .
 ```
 
-Node runs TypeScript directly, without a build step. `pnpm check` runs Vite+
-Oxlint, including the recommended Effect rules, and TypeScript; `pnpm test` runs
+Node runs TypeScript directly, without a build step. `pnpm check` checks formatting
+with Oxfmt, runs Oxlint including the recommended Effect rules, and checks
+TypeScript; `pnpm test` runs
 Vite+ Vitest. Installation patches Oxlint through `@effect/tsgo`, not TypeScript.
 Run `pnpm prepare` if you install with scripts disabled. Tests and configuration use
 the same strict type checks as the source. Format changed files with
-`pnpm exec vp fmt <paths>`, or add `--check` to check their formatting.
+`pnpm fmt <paths>` or check them with `pnpm fmt:check <paths>`. Omit the paths to
+format or check the whole repository. Oxfmt uses its defaults and the `fmt` settings
+in `vite.config.ts`; the generated lockfile is excluded.
 
 Tests load the Vite+ config with Node's native TypeScript support. The integration
 command also disables Vitest's disk cache so it can run in a read-only container.

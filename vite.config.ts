@@ -2,6 +2,9 @@ import { presets, recommended } from "@effect/tsgo/oxlint-presets";
 import { defineConfig } from "vite-plus";
 
 export default defineConfig({
+  fmt: {
+    ignorePatterns: ["pnpm-lock.yaml"],
+  },
   test: {
     include: ["*_test.ts"],
     // Integration tests exercise real subprocesses and the ten-second drive-lock retry.

@@ -41,13 +41,14 @@ Do not use v3 examples or a separate copy of Effect documentation.
 
 ## Checks
 
-Run `pnpm check` and `pnpm test`. Vite+ runs Oxlint and Vitest;
+Run `pnpm check` and `pnpm test`. Vite+ runs Oxfmt, Oxlint, and Vitest;
 TypeScript checks source, tests, and tool config. The official `@effect/tsgo`
 recommended preset runs Effect rules through Oxlint. `prepare` patches only
 Oxlint and its type-aware runner; keep TypeScript unpatched. Keep Vite+ settings in
-`vite.config.ts`. Use the formatter bundled with Vite+: `pnpm exec vp fmt <paths>`
-to format changed files, or add `--check` to check them. Keep formatting scoped to
-the files being changed.
+`vite.config.ts`, including the `fmt` settings for its bundled Oxfmt formatter.
+Run `pnpm fmt <paths>` to format changed files or `pnpm fmt:check <paths>` to check
+them. `pnpm check` includes the formatting check. Keep formatting scoped to the
+files being changed; the generated lockfile is excluded.
 
 Build the container and its `test` target, then run its integration tests when changing process or filesystem
 behavior. Test scheduling with Effect's TestClock, including timezone handling
