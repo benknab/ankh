@@ -4,6 +4,8 @@ import { track, withExecution } from "#telemetry/execution.ts";
 
 const Event = Schema.Struct({
   operation: Schema.String,
+  traceId: Schema.NonEmptyString,
+  spanId: Schema.NonEmptyString,
   messages: Schema.Array(
     Schema.Struct({
       text: Schema.String,
@@ -78,6 +80,11 @@ it.effect("concurrent and nested runs each emit their own data once", () =>
       ),
     );
     expect(events).toHaveLength(3);
+    const spans = Record.fromEntries(
+      Array.map(events, ([event]) => [event.operation, event] as const),
+    );
+    expect(spans.backup?.traceId).toBe(spans.retry?.traceId);
+    expect(spans.backup?.spanId).not.toBe(spans.retry?.spanId);
     expect(
       Array.map(events, ([event]) => [event.operation, event.data.owner, event.messages.length]),
     ).toEqual(

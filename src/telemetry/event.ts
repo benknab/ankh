@@ -32,7 +32,6 @@ export interface Details {
 
 export interface Completion extends Details, Messages {
   readonly event: "execution.completed";
-  readonly runId: string;
   readonly operation: Operation;
   readonly status: Status;
   readonly durationMs: number;

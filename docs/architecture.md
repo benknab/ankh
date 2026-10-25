@@ -31,11 +31,11 @@ See [operations](operations.md#outbox-transitions) for state and recovery rules.
 
 ## Execution telemetry
 
-`src/telemetry/` gives each command or scheduled backup a run ID and an Effect
+`src/telemetry/` gives each command or scheduled backup an execution span and an Effect
 service with run-local counters and a bounded log collector. Child fibers share
 that service. Concurrent runs
-have separate state. Clock supplies durations; log annotations and spans carry
-the ID through each step.
+have separate state. Clock supplies durations. The execution's trace/span IDs
+identify the run; child spans share its trace.
 
 After cleanup, one `execution.completed` event reports success, failure, or
 interruption. Step summaries include both destination results and process counts.

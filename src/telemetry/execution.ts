@@ -1,5 +1,4 @@
 import {
-  Array,
   Clock,
   Context,
   Effect,
@@ -7,7 +6,6 @@ import {
   Logger,
   MutableRef,
   Option,
-  Random,
   Ref,
   References,
 } from "effect";
@@ -26,7 +24,6 @@ import { fields } from "#telemetry/values.ts";
 export class Execution extends Context.Service<
   Execution,
   {
-    readonly runId: string;
     readonly operation: Operation;
     readonly started: number;
     readonly details: Ref.Ref<Details>;
@@ -35,14 +32,6 @@ export class Execution extends Context.Service<
   }
 >()("backup-runner/telemetry/execution") {}
 
-const runId = Effect.gen(function* () {
-  const parts = yield* Effect.forEach([0, 1, 2, 3], () => Random.nextIntBetween(0, 0xffff_ffff));
-  return Array.join(
-    Array.map(parts, (part) => part.toString(16).padStart(8, "0")),
-    "",
-  );
-});
-
 const complete = Effect.fnUntraced(function* <A, E>(
   run: Execution["Service"],
   exit: Exit.Exit<A, E>,
@@ -50,7 +39,6 @@ const complete = Effect.fnUntraced(function* <A, E>(
   const span = yield* Effect.currentSpan.pipe(Effect.orDie);
   const event: Completion = {
     event: "execution.completed",
-    runId: run.runId,
     operation: run.operation,
     status: status(exit),
     durationMs: (yield* Clock.currentTimeMillis) - run.started,
@@ -75,7 +63,6 @@ export const withExecution = <A, E, R>(
     Effect.gen(function* () {
       const parent = yield* Effect.serviceOption(Execution);
       const run = Execution.of({
-        runId: yield* runId,
         operation,
         started: yield* Clock.currentTimeMillis,
         details: yield* Ref.make<Details>({ steps: {} }),
@@ -86,9 +73,9 @@ export const withExecution = <A, E, R>(
         Effect.provideService(Execution, run),
         Effect.provideService(Logger.CurrentLoggers, new Set([collector(run.logs)])),
         Effect.onExit((exit) => complete(run, exit)),
-        Effect.annotateLogs({ runId: run.runId, operation }),
+        Effect.annotateLogs({ operation }),
         Effect.withLogSpan("execution"),
-        Effect.withSpan("execution", { attributes: { runId: run.runId, operation } }),
+        Effect.withSpan("execution", { attributes: { operation } }),
       );
     }),
   );

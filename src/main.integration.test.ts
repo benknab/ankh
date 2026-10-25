@@ -72,13 +72,15 @@ it.live("validate only reads the job file and rejects unknown fields", () =>
             event: Schema.Literal("execution.completed"),
             status: Schema.Literal("success"),
             operation: Schema.Literal("validate"),
-            runId: Schema.NonEmptyString,
+            traceId: Schema.String.check(Schema.isPattern(/^[a-f0-9]{32}$/u)),
+            spanId: Schema.String.check(Schema.isPattern(/^[a-f0-9]{16}$/u)),
           }),
-          annotations: Schema.Struct({ runId: Schema.NonEmptyString }),
+          annotations: Schema.Struct({ operation: Schema.Literal("validate") }),
         }),
       ),
     )(validation.stdout);
-    expect(line.message.runId).toBe(line.annotations.runId);
+    expect(line.message.operation).toBe(line.annotations.operation);
+    expect(validation.stdout).not.toContain('"runId"');
     yield* fs.writeFileString(
       file,
       yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({
