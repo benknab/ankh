@@ -8,104 +8,124 @@ import { Storage } from "#/storage/storage.ts";
 import { infrastructure } from "#/testing/infrastructure.ts";
 import { fixture } from "#/testing/fixtures.ts";
 
-it.live("Gitea staging updates a persistent mirror and restores Git history and contents", () =>
-  Effect.gen(function* () {
-    const storage = yield* Storage;
-    const { fs, path } = storage;
-    const commands = yield* Commands;
-    const root = yield* fs.makeTempDirectoryScoped();
-    const repository = path.join(root, "source");
-    yield* commands.run("git", ["init", "--initial-branch=main", repository]);
-    const git = Effect.fn("Test.git")((args: readonly string[]) =>
-      commands.run("git", ["-C", repository, ...args]),
-    );
-    yield* git(["config", "user.name", "Test Author"]);
-    yield* git(["config", "user.email", "test@example.com"]);
-    yield* git(["config", "commit.gpgsign", "false"]);
-    yield* fs.writeFileString(path.join(repository, "asset.bin"), "git-data".repeat(1024));
-    yield* fs.writeFileString(path.join(repository, "README"), "first revision");
-    yield* git(["add", "."]);
-    yield* git(["commit", "-m", "Initial test fixture"]);
-    const tokenFile = path.join(root, "token");
-    yield* fs.writeFileString(tokenFile, "synthetic-token");
-    const job = yield* Schema.decodeUnknownEffect(Job)({
-      ...fixture,
-      name: "gitea-test",
-      source: { type: "gitea-git", apiUrl: "https://example.com/gitea/", tokenFile },
-    });
-    const transport = HttpClient.make((request) =>
-      Effect.succeed(
-        HttpClientResponse.fromWeb(
-          request,
-          new Response(
-            Array.some(
-              Array.fromIterable(request.urlParams),
-              ([key, value]) => key === "page" && value === "1",
-            )
-              ? '[{"full_name":"example/repository"}]'
-              : "[]",
-            {
-              headers: { "content-type": "application/json" },
-            },
+it.live(
+  "Gitea staging updates concurrent persistent mirrors and restores Git history and contents",
+  () =>
+    Effect.gen(function* () {
+      const storage = yield* Storage;
+      const { fs, path } = storage;
+      const commands = yield* Commands;
+      const root = yield* fs.makeTempDirectoryScoped();
+      const repository = path.join(root, "source");
+      yield* commands.run("git", ["init", "--initial-branch=main", repository]);
+      const git = Effect.fn("Test.git")((args: readonly string[]) =>
+        commands.run("git", ["-C", repository, ...args]),
+      );
+      yield* git(["config", "user.name", "Test Author"]);
+      yield* git(["config", "user.email", "test@example.com"]);
+      yield* git(["config", "commit.gpgsign", "false"]);
+      yield* fs.writeFileString(path.join(repository, "asset.bin"), "git-data".repeat(1024));
+      yield* fs.writeFileString(path.join(repository, "README"), "first revision");
+      yield* git(["add", "."]);
+      yield* git(["commit", "-m", "Initial test fixture"]);
+      const tokenFile = path.join(root, "token");
+      yield* fs.writeFileString(tokenFile, "synthetic-token");
+      const job = yield* Schema.decodeUnknownEffect(Job)({
+        ...fixture,
+        name: "gitea-test",
+        source: { type: "gitea-git", apiUrl: "https://example.com/gitea/", tokenFile },
+      });
+      const repositoryNames = [
+        "example/repository",
+        ...Array.makeBy(4, (n) => `example/repository-${n + 1}`),
+      ];
+      const discovery = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(
+        Array.map(repositoryNames, (full_name) => ({ full_name })),
+      );
+      const transport = HttpClient.make((request) =>
+        Effect.succeed(
+          HttpClientResponse.fromWeb(
+            request,
+            new Response(
+              Array.some(
+                Array.fromIterable(request.urlParams),
+                ([key, value]) => key === "page" && value === "1",
+              )
+                ? discovery
+                : "[]",
+              {
+                headers: { "content-type": "application/json" },
+              },
+            ),
           ),
         ),
-      ),
-    );
-    const testCommands = Commands.of({
-      run: (binary, args, options) =>
-        binary === "git" && args[0] === "clone"
-          ? Effect.gen(function* () {
-              expect(args[2], "clone URL must preserve the base path").toBe(
-                "https://example.com/gitea/example/repository.git",
-              );
-              const target = yield* Schema.decodeUnknownEffect(Schema.String)(args[3]).pipe(
-                Effect.orDie,
-              );
-              return yield* commands.run(
-                binary,
-                ["clone", "--mirror", repository, target],
-                options,
-              );
-            })
-          : binary === "git" && args.includes("set-url")
-            ? commands.run(binary, [...args.slice(0, -1), repository], options)
-            : commands.run(binary, args, options),
-    });
-    const sources = Sources.layer.pipe(
-      Layer.provide(
-        Layer.mergeAll(
-          Layer.succeed(Storage, storage),
-          Layer.succeed(Commands, testCommands),
-          Layer.succeed(HttpClient.HttpClient, transport),
+      );
+      const testCommands = Commands.of({
+        run: (binary, args, options) =>
+          binary === "git" && args[0] === "clone"
+            ? Effect.gen(function* () {
+                expect(
+                  Array.map(repositoryNames, (name) => `https://example.com/gitea/${name}.git`),
+                  "clone URL must preserve the base path",
+                ).toContain(args[2]);
+                const target = yield* Schema.decodeUnknownEffect(Schema.String)(args[3]).pipe(
+                  Effect.orDie,
+                );
+                return yield* commands.run(
+                  binary,
+                  ["clone", "--mirror", repository, target],
+                  options,
+                );
+              })
+            : binary === "git" && args.includes("set-url")
+              ? commands.run(binary, [...args.slice(0, -1), repository], options)
+              : commands.run(binary, args, options),
+      });
+      const sources = Sources.layer.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.succeed(Storage, storage),
+            Layer.succeed(Commands, testCommands),
+            Layer.succeed(HttpClient.HttpClient, transport),
+          ),
         ),
-      ),
-    );
-    const stage = Effect.gen(function* () {
-      return yield* (yield* Sources).stage(job);
-    }).pipe(Effect.provide(sources));
-    yield* stage;
-    yield* fs.writeFileString(path.join(repository, "README"), "second revision");
-    yield* fs.writeFileString(path.join(repository, "asset.bin"), "new-git-data".repeat(1024));
-    yield* git(["add", "."]);
-    yield* git(["commit", "-m", "Update test fixture"]);
-    const directory = yield* stage;
-    const restored = path.join(root, "restored");
-    yield* commands.run("git", [
-      "clone",
-      path.join(directory, "repositories/example/repository.git"),
-      restored,
-    ]);
-    expect(
-      yield* fs.readFileString(path.join(restored, "README")),
-      "mirror must update existing refs",
-    ).toBe("second revision");
-    expect(
-      yield* fs.readFileString(path.join(restored, "asset.bin")),
-      "Git blobs must restore",
-    ).toBe("new-git-data".repeat(1024));
-    const historical = yield* commands.run("git", ["-C", restored, "show", "HEAD~1:asset.bin"]);
-    expect(Redacted.value(historical.stdout), "Git history must restore").toBe(
-      "git-data".repeat(1024),
-    );
-  }).pipe(Effect.provide(infrastructure)),
+      );
+      const stage = Effect.gen(function* () {
+        return yield* (yield* Sources).stage(job);
+      }).pipe(Effect.provide(sources));
+      yield* stage;
+      yield* fs.writeFileString(path.join(repository, "README"), "second revision");
+      yield* fs.writeFileString(path.join(repository, "asset.bin"), "new-git-data".repeat(1024));
+      yield* git(["add", "."]);
+      yield* git(["commit", "-m", "Update test fixture"]);
+      const directory = yield* stage;
+      const head = Redacted.value((yield* git(["rev-parse", "HEAD"])).stdout);
+      for (const name of repositoryNames) {
+        const mirrored = yield* commands.run("git", [
+          "-C",
+          path.join(directory, "repositories", `${name}.git`),
+          "rev-parse",
+          "HEAD",
+        ]);
+        expect(Redacted.value(mirrored.stdout), "every concurrent mirror must update").toBe(head);
+      }
+      const restored = path.join(root, "restored");
+      yield* commands.run("git", [
+        "clone",
+        path.join(directory, "repositories/example/repository.git"),
+        restored,
+      ]);
+      expect(
+        yield* fs.readFileString(path.join(restored, "README")),
+        "mirror must update existing refs",
+      ).toBe("second revision");
+      expect(
+        yield* fs.readFileString(path.join(restored, "asset.bin")),
+        "Git blobs must restore",
+      ).toBe("new-git-data".repeat(1024));
+      const historical = yield* commands.run("git", ["-C", restored, "show", "HEAD~1:asset.bin"]);
+      expect(Redacted.value(historical.stdout), "Git history must restore").toBe(
+        "git-data".repeat(1024),
+      );
+    }).pipe(Effect.provide(infrastructure)),
 );

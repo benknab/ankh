@@ -95,3 +95,33 @@ it.effect("Gitea continues through server-capped pages until an empty page", () 
     expect(page).toBe(3);
   }),
 );
+
+it.effect("Gitea deduplicates repositories repeated within and across discovery pages", () =>
+  Effect.gen(function* () {
+    let page = 0;
+    const transport = HttpClient.make((request) => {
+      page += 1;
+      const body =
+        page === 1
+          ? '[{"full_name":"owner/a"},{"full_name":"owner/a"}]'
+          : page === 2
+            ? '[{"full_name":"owner/a"},{"full_name":"owner/b"}]'
+            : "[]";
+      return Effect.succeed(HttpClientResponse.fromWeb(request, new Response(body)));
+    });
+    const repositories = yield* Effect.gen(function* () {
+      return yield* (yield* GiteaClient).repositories(yield* source);
+    }).pipe(
+      Effect.provide(
+        GiteaClient.layer.pipe(
+          Layer.provide(Layer.merge(storage, Layer.succeed(HttpClient.HttpClient, transport))),
+        ),
+      ),
+    );
+    expect(repositories).toHaveLength(2);
+    expect(repositories).toEqual(
+      expect.arrayContaining([{ full_name: "owner/a" }, { full_name: "owner/b" }]),
+    );
+    expect(page).toBe(3);
+  }),
+);

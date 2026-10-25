@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Redacted, Schema } from "effect";
+import { Array, Context, Effect, HashSet, Layer, Redacted, Schema } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
 import { backupError, type BackupError, type Gitea } from "#/domain/model.ts";
 import { Storage } from "#/storage/storage.ts";
@@ -31,16 +31,18 @@ export class GiteaClient extends Context.Service<
             Effect.provideService(Storage, storage),
           );
           const base = source.apiUrl.href.replace(/\/$/u, "");
-          const result: Repository[] = [];
+          let names = HashSet.empty<string>();
           for (let page = 1; ; page += 1) {
             const response = yield* client.get(`${base}/api/v1/user/repos`, {
               headers: { Authorization: `token ${Redacted.value(token)}` },
               urlParams: { limit: 50, page },
             });
             const batch = yield* HttpClientResponse.schemaBodyJson(Repositories)(response);
-            result.push(...batch);
+            for (const repository of batch) {
+              names = HashSet.add(names, repository.full_name);
+            }
             if (batch.length === 0) {
-              return result;
+              return Array.map(Array.fromIterable(names), (full_name) => ({ full_name }));
             }
           }
         },

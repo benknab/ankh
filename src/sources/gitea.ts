@@ -41,7 +41,8 @@ const mirrorRepositories = Effect.fn("Git.mirrorRepositories")(function* (
         mirror: path.join(directory, "repositories", `${repository.full_name}.git`),
         tokenFile: source.tokenFile,
       }),
-    { discard: true },
+    // Overlap network waits without launching a Git process for every repository at once.
+    { discard: true, concurrency: 4 },
   );
 });
 
