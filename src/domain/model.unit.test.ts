@@ -31,7 +31,7 @@ it.effect("configuration rejects unknown keys, invalid schedules, and destructiv
             Effect.result,
           ),
         ),
-        `unsafe config must fail: ${JSON.stringify(input)}`,
+        "unsafe config must fail",
       ).toBe(true);
     }
     yield* Schema.decodeUnknownEffect(Job)({

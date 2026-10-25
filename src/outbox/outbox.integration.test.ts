@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { DateTime, Effect, Exit, Layer, Ref, Result, Schema } from "effect";
+import { Array, DateTime, Effect, Exit, Layer, Option, Ref, Result, Schema } from "effect";
 import { Commands } from "#process/commands.ts";
 import { absolutePath, BackupError, Job, Proton } from "#domain/model.ts";
 import { Outbox } from "#outbox/outbox.ts";
@@ -31,38 +31,31 @@ it.live("durable outbox survives failure, retries through Queue, and restores SQ
     yield* outbox.enqueue(job, destination, stage);
     const initial = yield* fs.readDirectory(queuePath);
     expect(
-      initial.length === 1 && !initial[0]?.startsWith(".partial"),
+      initial.length === 1 && initial[0]?.startsWith(".partial") === false,
       "only a complete pair may be visible",
     ).toBe(true);
-    expect(((yield* fs.stat(queuePath)).mode & 0o777) === 0o700, "outbox must be private").toBe(
-      true,
-    );
+    expect((yield* fs.stat(queuePath)).mode & 0o777, "outbox must be private").toBe(0o700);
     const failure = yield* outbox
-      .drain(job, destination, () => Effect.fail(new BackupError({ message: "offline" })))
+      .drain(job, destination, () => Effect.fail(BackupError.make({ message: "offline" })))
       .pipe(Effect.result);
     expect(Result.isFailure(failure), "upload failure must be reported").toBe(true);
-    expect((yield* fs.readDirectory(queuePath)).length === 1, "failure must keep the pair").toBe(
-      true,
-    );
+    expect(yield* fs.readDirectory(queuePath), "failure must keep the pair").toHaveLength(1);
     const uploads = yield* Ref.make(0);
     yield* outbox.drain(job, destination, (archive) =>
       Effect.gen(function* () {
         yield* fs.copyFile(archive.file, path.join(remote, archive.name));
         yield* fs.copyFile(archive.checksum, path.join(remote, `${archive.name}.sha256`));
         yield* Ref.update(uploads, (n) => n + 1);
-      }).pipe(Effect.mapError((e) => new BackupError({ message: String(e) }))),
+      }).pipe(Effect.mapError((e) => BackupError.make({ message: String(e) }))),
     );
-    expect((yield* Ref.get(uploads)) === 1, "Queue should deliver the pending archive once").toBe(
-      true,
-    );
+    expect(yield* Ref.get(uploads), "Queue should deliver the pending archive once").toBe(1);
     expect(
-      (yield* fs.readDirectory(queuePath)).length === 0,
+      yield* fs.readDirectory(queuePath),
       "acknowledged pair must leave the outbox",
-    ).toBe(true);
-    const archive = (yield* fs.readDirectory(remote)).find((file) => file.endsWith(".tar.zst"));
-    if (!archive) {
-      return yield* Effect.die("missing uploaded archive");
-    }
+    ).toHaveLength(0);
+    const archive = Option.getOrThrow(
+      Array.findFirst(yield* fs.readDirectory(remote), (file) => file.endsWith(".tar.zst")),
+    );
     yield* commands.run("sha256sum", ["--check", `${archive}.sha256`], { cwd: remote });
     const restore = path.join(root, "restore");
     yield* fs.makeDirectory(restore);
@@ -78,7 +71,7 @@ it.live("durable outbox survives failure, retries through Queue, and restores SQ
       path.join(restore, "test-job/test.db"),
       "SELECT value FROM records;",
     ]);
-    expect(value === "verified", "archive must restore the original database").toBe(true);
+    expect(value.stdout, "archive must restore the original database").toBe("verified");
     yield* Effect.logInfo("Restore verified", DateTime.formatIso(yield* DateTime.now));
   }).pipe(Effect.provide(outboxInfrastructure)),
 );
@@ -104,8 +97,8 @@ for (const legacy of [false, true]) {
         const outbox = yield* Outbox;
         yield* outbox.enqueue(job, destination, stage);
         if (legacy) {
-          const [entry] = yield* fs.readDirectory(destination.outbox);
-          const ready = path.join(destination.outbox, entry!);
+          const entry = Option.getOrThrow(Array.head(yield* fs.readDirectory(destination.outbox)));
+          const ready = path.join(destination.outbox, entry);
           for (const file of yield* fs.readDirectory(ready)) {
             yield* fs.rename(path.join(ready, file), path.join(destination.outbox, file));
           }
@@ -135,18 +128,13 @@ for (const legacy of [false, true]) {
           yield* pending.drain(job, destination, () => Ref.update(uploads, (n) => n + 1));
         }).pipe(Effect.provide(interrupted), Effect.exit);
         expect(Exit.isFailure(exit), "injected interruption must occur").toBe(true);
-        expect(
-          (yield* Ref.get(uploads)) === 1,
-          "upload must have completed before interruption",
-        ).toBe(true);
+        expect(yield* Ref.get(uploads), "upload must have completed before interruption").toBe(1);
         yield* outbox.drain(job, destination, () => Ref.update(uploads, (n) => n + 1));
-        expect((yield* Ref.get(uploads)) === 1, "retired archives must not upload twice").toBe(
-          true,
-        );
+        expect(yield* Ref.get(uploads), "retired archives must not upload twice").toBe(1);
         expect(
-          (yield* fs.readDirectory(destination.outbox)).length === 0,
+          yield* fs.readDirectory(destination.outbox),
           "retry must complete local retirement",
-        ).toBe(true);
+        ).toHaveLength(0);
       }).pipe(Effect.provide(outboxInfrastructure)),
   );
 }
@@ -166,9 +154,9 @@ it.live("a corrupt ready archive stays on disk while later valid archives upload
     });
     const job = yield* Schema.decodeUnknownEffect(Job)(fixture);
     yield* outbox.enqueue(job, destination, stage);
-    const [entry] = yield* fs.readDirectory(destination.outbox);
+    const entry = Option.getOrThrow(Array.head(yield* fs.readDirectory(destination.outbox)));
     yield* fs.writeFileString(
-      path.join(destination.outbox, entry!, `${entry}.tar.zst`),
+      path.join(destination.outbox, entry, `${entry}.tar.zst`),
       "corrupted",
     );
     yield* outbox.enqueue(job, destination, stage);
@@ -177,11 +165,11 @@ it.live("a corrupt ready archive stays on disk while later valid archives upload
       .drain(job, destination, () => Ref.update(uploads, (n) => n + 1))
       .pipe(Effect.result);
     expect(Result.isFailure(result), "corruption must be reported").toBe(true);
-    expect((yield* Ref.get(uploads)) === 1, "valid archive must still upload").toBe(true);
+    expect(yield* Ref.get(uploads), "valid archive must still upload").toBe(1);
     expect(
-      (yield* fs.readDirectory(destination.outbox)).length === 1,
+      yield* fs.readDirectory(destination.outbox),
       "corrupt archive must stay available for diagnosis",
-    ).toBe(true);
+    ).toHaveLength(1);
   }).pipe(Effect.provide(outboxInfrastructure)),
 );
 
@@ -207,7 +195,7 @@ for (const failure of ["tar", "checksum", "verify", "zstd", "publish", "cleanup"
           (binary === "zstd" && failure === "zstd") ||
           (binary === "sha256sum" &&
             (args[0] === "--check" ? failure === "verify" : failure === "checksum"))
-            ? Effect.fail(new BackupError({ message: "injected failure" }))
+            ? Effect.fail(BackupError.make({ message: "injected failure" }))
             : commands.run(binary, args, options),
       });
       const failedStorage = Storage.of({
@@ -235,7 +223,7 @@ for (const failure of ["tar", "checksum", "verify", "zstd", "publish", "cleanup"
       }).pipe(Effect.provide(layer), Effect.result);
       expect(Result.isFailure(result), "failure must stay in the Effect error channel").toBe(true);
       expect(
-        (yield* fs.readDirectory(destination.outbox)).every((entry) =>
+        Array.every(yield* fs.readDirectory(destination.outbox), (entry) =>
           entry.startsWith(".partial-"),
         ),
         "failed publication must not expose ready data",

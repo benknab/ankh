@@ -26,7 +26,9 @@ export const runRestic = Effect.fn("Restic.run")(function* (
     },
   };
   const run = (args: readonly string[]) =>
-    commands.run("restic", args, options).pipe(Effect.tap(Effect.logInfo));
+    commands
+      .run("restic", args, options)
+      .pipe(Effect.tap((result) => Effect.logInfo(result.stdout)));
   if (action === "init") {
     if (!(yield* fs.exists(path.join(destination.repository, "config")))) {
       yield* run(["init"]);

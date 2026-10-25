@@ -14,13 +14,12 @@ it.live("Node runs the TypeScript CLI and rejects unsafe job paths", () =>
     const entry = path.join(import.meta.dirname, "main.ts");
     const help = yield* commands.run(process.execPath, [entry, "--help"]);
     for (const action of [...Actions, "schedule", "proton-login", "validate"]) {
-      expect(help.includes(action), `missing subcommand: ${action}`).toBe(true);
+      expect(help.stdout).toContain(action);
     }
     const version = yield* commands.run(process.execPath, [entry, "--version"]);
-    expect(
-      version === `backup-runner v${metadata.version}`,
-      "CLI must use the package version",
-    ).toBe(true);
+    expect(version.stdout, "CLI must use the package version").toBe(
+      `backup-runner v${metadata.version}`,
+    );
     const invalid = yield* commands
       .run(process.execPath, [entry, "backup", "relative/job.json"])
       .pipe(Effect.result);
@@ -37,8 +36,8 @@ it.live("Node child processes drain large output and report failed exits", () =>
       "--eval",
       'process.stdout.write("o".repeat(256 * 1024)); process.stderr.write("e".repeat(256 * 1024));',
     ]);
-    expect(output === "o".repeat(256 * 1024), "stdout and stderr must drain without deadlock").toBe(
-      true,
+    expect(output.stdout, "stdout and stderr must drain without deadlock").toBe(
+      "o".repeat(256 * 1024),
     );
     const failed = yield* commands
       .run(process.execPath, [
@@ -48,11 +47,8 @@ it.live("Node child processes drain large output and report failed exits", () =>
       .pipe(Effect.result);
     expect(Result.isFailure(failed), "nonzero exit must fail").toBe(true);
     if (Result.isFailure(failed)) {
-      expect(
-        failed.failure.message.includes("exited 7") &&
-          failed.failure.message.includes("probe-failure"),
-        "failure must preserve exit code and stderr",
-      ).toBe(true);
+      expect(failed.failure.exitCode).toBe(7);
+      expect(failed.failure.message).toContain("probe-failure");
     }
   }).pipe(Effect.provide(infrastructure)),
 );
@@ -64,9 +60,18 @@ it.live("validate only reads the job file and rejects unknown fields", () =>
     const root = yield* fs.makeTempDirectoryScoped();
     const file = path.join(root, "job.json");
     const entry = path.join(import.meta.dirname, "main.ts");
-    yield* fs.writeFileString(file, JSON.stringify(fixture));
+    yield* fs.writeFileString(
+      file,
+      yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(fixture),
+    );
     yield* commands.run(process.execPath, [entry, "validate", file]);
-    yield* fs.writeFileString(file, JSON.stringify({ ...fixture, ignored: true }));
+    yield* fs.writeFileString(
+      file,
+      yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({
+        ...fixture,
+        ignored: true,
+      }),
+    );
     expect(
       Result.isFailure(
         yield* commands.run(process.execPath, [entry, "validate", file]).pipe(Effect.result),
@@ -88,11 +93,11 @@ it.live("Node filesystem scopes release the drive lock after failure", () =>
     const failed = yield* Effect.gen(function* () {
       yield* withLock(job);
       expect(yield* fs.exists(lock), "lock must exist while held").toBe(true);
-      return yield* new BackupError({ message: "probe-failure" });
+      return yield* BackupError.make({ message: "probe-failure" });
     }).pipe(Effect.scoped, Effect.result);
     expect(Result.isFailure(failed), "test job must fail").toBe(true);
-    expect(!(yield* fs.exists(lock)), "failed job scope must release the lock").toBe(true);
+    expect(yield* fs.exists(lock), "failed job scope must release the lock").toBe(false);
     yield* withLock(job).pipe(Effect.scoped);
-    expect(!(yield* fs.exists(lock)), "next job must acquire and release the lock").toBe(true);
+    expect(yield* fs.exists(lock), "next job must acquire and release the lock").toBe(false);
   }).pipe(Effect.provide(infrastructure)),
 );

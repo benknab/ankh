@@ -16,8 +16,8 @@ it.live("concurrent scheduled jobs wait for the shared drive lock", () =>
         sentinelFile: path.join(root, ".sentinel"),
       },
     });
-    const held = yield* Deferred.make<void>();
-    const release = yield* Deferred.make<void>();
+    const held = yield* Deferred.make<undefined>();
+    const release = yield* Deferred.make<undefined>();
     const acquired = yield* Ref.make(false);
     const first = yield* Effect.forkChild(
       Effect.gen(function* () {
@@ -34,15 +34,15 @@ it.live("concurrent scheduled jobs wait for the shared drive lock", () =>
       }).pipe(Effect.scoped),
     );
     yield* Effect.sleep("100 millis");
-    expect(!(yield* Ref.get(acquired)), "another job must not enter while lock is held").toBe(true);
+    expect(yield* Ref.get(acquired), "another job must not enter while lock is held").toBe(false);
     yield* Deferred.succeed(release, undefined);
     yield* Fiber.join(first);
     yield* Fiber.join(second);
     expect(yield* Ref.get(acquired), "waiting job must acquire released lock").toBe(true);
     expect(
-      !(yield* fs.exists(path.join(root, ".runner-lock"))),
+      yield* fs.exists(path.join(root, ".runner-lock")),
       "both scopes must release the lock",
-    ).toBe(true);
+    ).toBe(false);
   }).pipe(Effect.provide(infrastructure)),
 );
 

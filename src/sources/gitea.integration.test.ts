@@ -16,7 +16,9 @@ it.live("Gitea staging updates a persistent mirror and restores Git and LFS cont
     const root = yield* fs.makeTempDirectoryScoped();
     const repository = path.join(root, "source");
     yield* commands.run("git", ["init", "--initial-branch=main", repository]);
-    const git = (args: readonly string[]) => commands.run("git", ["-C", repository, ...args]);
+    const git = Effect.fn("Test.git")((args: readonly string[]) =>
+      commands.run("git", ["-C", repository, ...args]),
+    );
     yield* git(["config", "user.name", "Test Author"]);
     yield* git(["config", "user.email", "test@example.com"]);
     yield* git(["config", "commit.gpgsign", "false"]);
@@ -33,27 +35,29 @@ it.live("Gitea staging updates a persistent mirror and restores Git and LFS cont
       name: "gitea-test",
       source: { type: "gitea-git", apiUrl: "https://example.com/gitea/", tokenFile },
     });
-    const transport = HttpClient.make((request) => {
-      return Effect.succeed(
+    const transport = HttpClient.make((request) =>
+      Effect.succeed(
         HttpClientResponse.fromWeb(
           request,
-          new Response(JSON.stringify([{ full_name: "example/repository" }]), {
+          new Response('[{"full_name":"example/repository"}]', {
             headers: { "content-type": "application/json" },
           }),
         ),
-      );
-    });
+      ),
+    );
     const testCommands = Commands.of({
       run: (binary, args, options) =>
         binary === "git" && args[0] === "clone"
           ? Effect.gen(function* () {
-              expect(
-                args[2] === "https://example.com/gitea/example/repository.git",
-                "clone URL must preserve the base path",
-              ).toBe(true);
+              expect(args[2], "clone URL must preserve the base path").toBe(
+                "https://example.com/gitea/example/repository.git",
+              );
+              const target = yield* Schema.decodeUnknownEffect(Schema.String)(args[3]).pipe(
+                Effect.orDie,
+              );
               return yield* commands.run(
                 binary,
-                [args[0]!, args[1]!, repository, args[3]!],
+                ["clone", "--mirror", repository, target],
                 options,
               );
             })
@@ -84,12 +88,12 @@ it.live("Gitea staging updates a persistent mirror and restores Git and LFS cont
     );
     yield* commands.run("git", ["-C", restored, "lfs", "pull"]);
     expect(
-      (yield* fs.readFileString(path.join(restored, "README"))) === "second revision",
+      yield* fs.readFileString(path.join(restored, "README")),
       "mirror must update existing refs",
-    ).toBe(true);
+    ).toBe("second revision");
     expect(
-      (yield* fs.readFileString(path.join(restored, "asset.bin"))) === "lfs-data".repeat(1024),
+      yield* fs.readFileString(path.join(restored, "asset.bin")),
       "LFS objects must restore",
-    ).toBe(true);
+    ).toBe("lfs-data".repeat(1024));
   }).pipe(Effect.provide(infrastructure)),
 );

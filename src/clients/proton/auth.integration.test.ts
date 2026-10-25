@@ -5,6 +5,7 @@ import { Commands } from "#process/commands.ts";
 import { protonEnvironment } from "#clients/proton/state.ts";
 import { Storage } from "#storage/storage.ts";
 import { infrastructure } from "#testing/infrastructure.ts";
+import { output } from "#testing/commands.ts";
 
 it.live("Proton credential setup creates a usable encryption key", () =>
   Effect.gen(function* () {
@@ -13,7 +14,7 @@ it.live("Proton credential setup creates a usable encryption key", () =>
     const testCommands = Commands.of({
       run: (binary, args, options) =>
         binary === "proton-drive"
-          ? Effect.succeed("login skipped in test")
+          ? Effect.succeed(output("login skipped in test"))
           : commands.run(binary, args, options),
     });
     yield* login().pipe(Effect.provideService(Commands, testCommands));
@@ -35,10 +36,9 @@ it.live("Proton credential setup creates a usable encryption key", () =>
     const decrypted = yield* commands.run("gpg", ["--batch", "--decrypt", "/proton/probe.gpg"], {
       env: protonEnvironment,
     });
-    expect(
-      decrypted === "credential-round-trip",
-      "session encryption key must support decryption",
-    ).toBe(true);
+    expect(decrypted.stdout, "session encryption key must support decryption").toBe(
+      "credential-round-trip",
+    );
     // A second login setup must reuse the existing key and store.
     yield* login().pipe(Effect.provideService(Commands, testCommands));
   }).pipe(Effect.provide(infrastructure)),

@@ -37,7 +37,7 @@ it.live("retention retries only journaled partial deletions and rejects unrelate
           ).toBe(true);
           yield* Ref.update(names, (set) => HashSet.remove(set, old));
           if (yield* Ref.getAndSet(fail, false)) {
-            return yield* new BackupError({ message: "interrupted remote deletion" });
+            return yield* BackupError.make({ message: "interrupted remote deletion" });
           }
           yield* Ref.update(names, (set) => HashSet.remove(set, `${old}.sha256`));
         }),
@@ -52,9 +52,9 @@ it.live("retention retries only journaled partial deletions and rejects unrelate
     ).toBe(true);
     yield* run;
     expect(
-      (yield* fs.readDirectory(destination.outbox)).length === 0,
+      yield* fs.readDirectory(destination.outbox),
       "confirmed deletion must retire intent",
-    ).toBe(true);
+    ).toHaveLength(0);
     yield* Ref.update(names, (set) => HashSet.add(set, `${old}.sha256`));
     expect(
       Result.isFailure(yield* run.pipe(Effect.result)),

@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { DateTime, Effect, HashSet, Layer, Ref, Result, Schema } from "effect";
+import { Array, DateTime, Effect, HashSet, Layer, Ref, Result, Schema } from "effect";
 import { Destinations } from "#destinations/destinations.ts";
 import { absolutePath, BackupError, Job, JobName } from "#domain/model.ts";
 import { archiveName } from "#domain/archive.ts";
@@ -38,7 +38,7 @@ for (const reverse of [false, true]) {
         Effect.gen(function* () {
           const job = yield* Schema.decodeUnknownEffect(Job)({
             ...fixture,
-            destinations: reverse ? [...fixture.destinations].reverse() : fixture.destinations,
+            destinations: reverse ? Array.reverse(fixture.destinations) : fixture.destinations,
           });
           const stages = yield* Ref.make(0);
           const attempts = yield* Ref.make(HashSet.empty<string>());
@@ -54,13 +54,10 @@ for (const reverse of [false, true]) {
             Destinations.of({
               run: (_job, destination, request) =>
                 Effect.gen(function* () {
-                  expect(
-                    request.action === "backup" && request.stage === "/staging/test-job",
-                    "same stage must reach each destination",
-                  ).toBe(true);
+                  expect(request).toStrictEqual({ action: "backup", stage: "/staging/test-job" });
                   yield* Ref.update(attempts, (set) => HashSet.add(set, destination.type));
                   if (destination.type === failed) {
-                    return yield* new BackupError({ message: "offline" });
+                    return yield* BackupError.make({ message: "offline" });
                   }
                 }),
             }),
@@ -70,10 +67,8 @@ for (const reverse of [false, true]) {
             Effect.result,
           );
           expect(Result.isFailure(result), "partial failure must fail the job").toBe(true);
-          expect((yield* Ref.get(stages)) === 1, "source must stage once").toBe(true);
-          expect(HashSet.size(yield* Ref.get(attempts)) === 2, "both destinations must run").toBe(
-            true,
-          );
+          expect(yield* Ref.get(stages), "source must stage once").toBe(1);
+          expect(HashSet.size(yield* Ref.get(attempts)), "both destinations must run").toBe(2);
         }),
     );
   }
@@ -87,9 +82,9 @@ it.effect("retention consumes parsed snapshots and keeps newest per UTC period",
       "2026-01-01T10:00:00Z",
       "2025-12-31T20:00:00Z",
       "2025-12-20T20:00:00Z",
-    ];
-    const names = timestamps.map((time) => archiveName(job, DateTime.makeUnsafe(time)));
-    const files = HashSet.fromIterable(names.flatMap((name) => [name, `${name}.sha256`]));
+    ] as const;
+    const names = Array.map(timestamps, (time) => archiveName(job, DateTime.makeUnsafe(time)));
+    const files = HashSet.fromIterable(Array.flatMap(names, (name) => [name, `${name}.sha256`]));
     const snapshots = yield* parseSnapshotPairs(job, files);
     const expired = expiredSnapshots(snapshots, {
       daily: 1,
@@ -97,13 +92,11 @@ it.effect("retention consumes parsed snapshots and keeps newest per UTC period",
       monthly: 0,
       yearly: 0,
     });
-    expect(HashSet.size(expired) === 2, "same day and same ISO week copies should expire").toBe(
-      true,
-    );
+    expect(HashSet.size(expired), "same day and same ISO week copies should expire").toBe(2);
     expect(
-      !HashSet.has(expired, archiveName(job, DateTime.makeUnsafe(timestamps[0]!))),
+      HashSet.has(expired, archiveName(job, DateTime.makeUnsafe(timestamps[0]))),
       "newest must survive",
-    ).toBe(true);
+    ).toBe(false);
     const missing = yield* parseSnapshotPairs(job, HashSet.fromIterable(names)).pipe(Effect.result);
     expect(Result.isFailure(missing), "retention must reject incomplete pairs").toBe(true);
   }),
@@ -120,7 +113,7 @@ it.effect("retention keeps 14 daily, 8 weekly, 12 monthly, and 5 yearly periods"
       { unit: "years", count: 5, policy: "yearly", step: 1 },
     ] as const;
     for (const test of cases) {
-      const snapshots = Array.from({ length: 20 }, (_, n) => {
+      const snapshots = Array.makeBy(20, (n) => {
         const time = DateTime.add(start, { [test.unit]: n * test.step });
         return { name: archiveName(job, time), time };
       });
@@ -132,9 +125,9 @@ it.effect("retention keeps 14 daily, 8 weekly, 12 monthly, and 5 yearly periods"
         [test.policy]: test.count,
       };
       expect(
-        HashSet.size(expiredSnapshots(snapshots, policy)) === 20 - test.count,
+        HashSet.size(expiredSnapshots(snapshots, policy)),
         `${test.policy} count is wrong`,
-      ).toBe(true);
+      ).toBe(20 - test.count);
     }
   }),
 );

@@ -105,7 +105,7 @@ const enqueue = Effect.fn("Outbox.enqueue")(function* (
         ]);
         yield* fs.chmod(file, 0o600);
         const output = yield* commands.run("sha256sum", [name], { cwd: temporary });
-        yield* fs.writeFileString(`${file}.sha256`, `${output}\n`, { mode: 0o600 });
+        yield* fs.writeFileString(`${file}.sha256`, `${output.stdout}\n`, { mode: 0o600 });
         yield* verify({
           name,
           file,

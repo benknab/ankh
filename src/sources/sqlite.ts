@@ -18,8 +18,8 @@ export const stageSqlite = Effect.fn("Sqlite.stage")(function* (
     `.backup ${output}`,
   ]);
   const checked = yield* commands.run("sqlite3", [output, "PRAGMA quick_check;"]);
-  if (checked !== "ok") {
-    return yield* new BackupError({ message: `SQLite quick_check failed: ${checked}` });
+  if (checked.stdout !== "ok") {
+    return yield* new BackupError({ message: `SQLite quick_check failed: ${checked.stdout}` });
   }
   return directory;
 });

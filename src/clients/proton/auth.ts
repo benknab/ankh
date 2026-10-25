@@ -17,7 +17,7 @@ export const login = Effect.fn("Proton.login")(function* () {
     ["--batch", "--with-colons", "--list-secret-keys"],
     options,
   );
-  if (!keys.includes(identity)) {
+  if (!keys.stdout.includes(identity)) {
     yield* commands.run(
       "gpg",
       [
@@ -40,7 +40,7 @@ export const login = Effect.fn("Proton.login")(function* () {
     ["--batch", "--with-colons", "--list-secret-keys", identity],
     options,
   );
-  const fingerprint = listing
+  const fingerprint = listing.stdout
     .split("\n")
     .find((line) => line.startsWith("fpr:"))
     ?.split(":")[9];
@@ -51,7 +51,7 @@ export const login = Effect.fn("Proton.login")(function* () {
   }
   // Repair the sign-only key created by the pre-Effect prototype.
   if (
-    !listing
+    !listing.stdout
       .split("\n")
       .some((line) => line.startsWith("ssb:") && line.split(":")[11]?.includes("e"))
   ) {

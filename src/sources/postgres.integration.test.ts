@@ -71,15 +71,14 @@ it.live("PostgreSQL source dumps and restores data, and rejects bad credentials"
       ],
       { env: { ...env, PGDATABASE: "restore_test" } },
     );
-    expect(value === "verified", "dump must restore original data").toBe(true);
+    expect(value.stdout, "dump must restore original data").toBe("verified");
     yield* fs.writeFileString(passwordFile, "wrong-password");
     const failed = yield* sources.stage(job).pipe(Effect.result);
     expect(Result.isFailure(failed), "bad credentials must fail staging").toBe(true);
     if (Result.isFailure(failed)) {
-      expect(
-        !failed.failure.message.includes("wrong-password"),
-        "errors must not expose passwords",
-      ).toBe(true);
+      expect(failed.failure.message, "errors must not expose passwords").not.toContain(
+        "wrong-password",
+      );
     }
   }).pipe(
     Effect.provide(

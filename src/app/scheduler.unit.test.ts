@@ -15,22 +15,18 @@ for (const [season, utcHour] of [
       const attempts = yield* Ref.make(0);
       const backup = Ref.updateAndGet(attempts, (n) => n + 1).pipe(
         Effect.flatMap((n) =>
-          n === 1 ? Effect.fail(new BackupError({ message: "offline" })) : Effect.void,
+          n === 1 ? Effect.fail(BackupError.make({ message: "offline" })) : Effect.void,
         ),
       );
       const fiber = yield* Effect.forkChild(scheduledAttempts(backup));
       yield* TestClock.adjust("59 seconds");
-      expect(
-        (yield* Ref.get(attempts)) === 0,
-        "must wait for scheduled time, not run on startup",
-      ).toBe(true);
+      expect(yield* Ref.get(attempts), "must wait for scheduled time, not run on startup").toBe(0);
       yield* TestClock.adjust("1 second");
-      expect((yield* Ref.get(attempts)) === 1, "must run at 03:30 local time").toBe(true);
+      expect(yield* Ref.get(attempts), "must run at 03:30 local time").toBe(1);
       yield* TestClock.adjust("24 hours");
-      expect(
-        (yield* Ref.get(attempts)) === 2,
-        "a failed job must not stop the next day's schedule",
-      ).toBe(true);
+      expect(yield* Ref.get(attempts), "a failed job must not stop the next day's schedule").toBe(
+        2,
+      );
       yield* Fiber.interrupt(fiber);
     }),
   );
@@ -51,11 +47,11 @@ for (const [before, nextDayHours] of [
         ),
       );
       yield* TestClock.adjust("1 minute");
-      expect((yield* Ref.get(attempts)) === 1, "first local run must occur").toBe(true);
+      expect(yield* Ref.get(attempts), "first local run must occur").toBe(1);
       yield* TestClock.adjust(nextDayHours * 60 * 60 * 1000 - 1);
-      expect((yield* Ref.get(attempts)) === 1, "must wait for the next local run").toBe(true);
+      expect(yield* Ref.get(attempts), "must wait for the next local run").toBe(1);
       yield* TestClock.adjust(1);
-      expect((yield* Ref.get(attempts)) === 2, "DST must preserve local scheduled time").toBe(true);
+      expect(yield* Ref.get(attempts), "DST must preserve local scheduled time").toBe(2);
       yield* Fiber.interrupt(fiber);
     }),
   );

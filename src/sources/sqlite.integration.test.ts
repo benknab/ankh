@@ -26,12 +26,10 @@ it.live("SQLite staging preserves URI-special characters in source paths", () =>
     });
     const staged = yield* sources.stage(job);
     expect(
-      (yield* commands.run("sqlite3", [
-        path.join(staged, "test.db"),
-        "SELECT value FROM records;",
-      ])) === "verified",
+      (yield* commands.run("sqlite3", [path.join(staged, "test.db"), "SELECT value FROM records;"]))
+        .stdout,
       "staging must read the exact source path",
-    ).toBe(true);
+    ).toBe("verified");
   }).pipe(
     Effect.provide(
       Sources.layer.pipe(Layer.provideMerge(Layer.mergeAll(infrastructure, FetchHttpClient.layer))),

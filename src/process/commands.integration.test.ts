@@ -11,7 +11,7 @@ it.live("Commands drains stdout and stderr and rejects nonzero exits", () =>
       .pipe(Effect.result);
     expect(Result.isFailure(result), "exit 7 must fail").toBe(true);
     if (Result.isFailure(result)) {
-      expect(result.failure.message.includes("failure"), "stderr must be in the error").toBe(true);
+      expect(result.failure.message, "stderr must be in the error").toContain("failure");
     }
   }).pipe(Effect.provide(infrastructure)),
 );
@@ -24,10 +24,9 @@ it.live("command diagnostics are bounded and redact supplied secrets", () =>
       ["--eval", 'process.stdout.write("x".repeat(1024 * 1024) + "end")'],
       { output: "tail" },
     );
-    expect(
-      tail.length <= 64 * 1024 && tail.endsWith("end"),
-      "ordinary output must retain only a bounded tail",
-    ).toBe(true);
+    expect(tail.stdout.length).toBeLessThanOrEqual(64 * 1024);
+    expect(tail.stdout.endsWith("end")).toBe(true);
+    expect(tail.exitCode).toBe(0);
     const failed = yield* commands
       .run(
         process.execPath,
@@ -37,14 +36,11 @@ it.live("command diagnostics are bounded and redact supplied secrets", () =>
       .pipe(Effect.result);
     expect(Result.isFailure(failed), "command must fail").toBe(true);
     if (Result.isFailure(failed)) {
-      expect(
-        failed.failure.exitCode === 7 && failed.failure.operation === process.execPath,
-        "structured failure details must survive",
-      ).toBe(true);
-      expect(
-        !failed.failure.message.includes("synthetic-secret"),
-        "diagnostics must redact secrets",
-      ).toBe(true);
+      expect(failed.failure.exitCode).toBe(7);
+      expect(failed.failure.operation).toBe(process.execPath);
+      expect(failed.failure.message, "diagnostics must redact secrets").not.toContain(
+        "synthetic-secret",
+      );
     }
   }).pipe(Effect.provide(infrastructure)),
 );

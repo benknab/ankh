@@ -39,9 +39,11 @@ export class ProtonDrive extends Context.Service<
     Effect.gen(function* () {
       const commands = yield* Commands;
       const run = (args: readonly string[]) =>
-        commands.run("proton-drive", ["filesystem", ...args], {
-          env: protonEnvironment,
-        });
+        commands
+          .run("proton-drive", ["filesystem", ...args], {
+            env: protonEnvironment,
+          })
+          .pipe(Effect.map((result) => result.stdout));
       const list = Effect.fn("ProtonDrive.list")(
         function* (destination: Proton) {
           const nodes = yield* Schema.decodeEffect(RemoteNodes)(
