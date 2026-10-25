@@ -24,7 +24,7 @@ const verify = Effect.fn("Outbox.verify")(function* (archive: Archive) {
   const { fs } = yield* Storage;
   const commands = yield* Commands;
   const checksum = yield* fs.readFileString(archive.checksum);
-  yield* Schema.decodeUnknownEffect(
+  yield* Schema.decodeEffect(
     Schema.String.check(
       Schema.isPattern(new RegExp(`^[a-f0-9]{64}  ${archive.name.replace(/[.]/g, "\\.")}\n?$`)),
     ),

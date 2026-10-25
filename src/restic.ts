@@ -14,7 +14,7 @@ export const runRestic = Effect.fn("Restic.run")(function* (
   }
   const { fs, path } = yield* Storage;
   const commands = yield* Commands;
-  yield* Schema.decodeUnknownEffect(Schema.NonEmptyString)(
+  yield* Schema.decodeEffect(Schema.NonEmptyString)(
     (yield* fs.readFileString(destination.passwordFile)).trim(),
   );
   const options = {

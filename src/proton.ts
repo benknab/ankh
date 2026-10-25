@@ -35,7 +35,7 @@ export class ProtonDrive extends Context.Service<
         });
       const list = Effect.fn("ProtonDrive.list")(
         function* (destination: Proton) {
-          const nodes = yield* Schema.decodeUnknownEffect(RemoteNodes)(
+          const nodes = yield* Schema.decodeEffect(RemoteNodes)(
             yield* run(["list", "--json", "--type", "file", destination.remoteFolder]),
           );
           return HashSet.fromIterable(nodes.map((node) => node.name.value));

@@ -62,7 +62,7 @@ const stage = Effect.fn("Sources.stage")(
     }
 
     const token = (yield* fs.readFileString(source.tokenFile)).trim();
-    yield* Schema.decodeUnknownEffect(Schema.NonEmptyString)(token);
+    yield* Schema.decodeEffect(Schema.NonEmptyString)(token);
     const client = (yield* HttpClient.HttpClient).pipe(HttpClient.filterStatusOk);
     const base = source.apiUrl.replace(/\/$/, "");
     const repositories: Array<(typeof Repositories.Type)[number]> = [];

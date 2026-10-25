@@ -1,6 +1,9 @@
 import { Brand, Schema } from "effect";
 
-export class BackupError extends Schema.TaggedError<BackupError>()("BackupError", {
+export class BackupError extends Schema.TaggedError<
+  BackupError,
+  { readonly brand: unique symbol }
+>()("BackupError", {
   message: Schema.String,
 }) {}
 
@@ -14,7 +17,7 @@ export const AbsolutePath = Schema.String.check(
 export type AbsolutePath = typeof AbsolutePath.Type;
 export const absolutePath = Brand.nominal<AbsolutePath>();
 export const RemoteFolder = Schema.String.check(
-  Schema.isPattern(/^\/my-files\/(?!.*(?:^|\/)\.\.?($|\/))[^\\\0]+[^\/]$/),
+  Schema.isPattern(/^\/my-files\/(?!.*(?:^|\/)\.\.?($|\/))[^\\\0]+[^/]$/),
 ).pipe(Schema.brand("RemoteFolder"));
 export type RemoteFolder = typeof RemoteFolder.Type;
 export const ArchiveName = Schema.String.check(

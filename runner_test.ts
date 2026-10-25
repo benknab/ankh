@@ -74,7 +74,7 @@ for (const failed of ["restic", "proton-drive"] as const) {
 test("retention consumes parsed snapshots and keeps newest per UTC period", () =>
   Effect.runPromise(
     Effect.gen(function* () {
-      const job = yield* Schema.decodeUnknownEffect(JobName)("test-job");
+      const job = yield* Schema.decodeEffect(JobName)("test-job");
       const timestamps = [
         "2026-01-01T20:00:00Z",
         "2026-01-01T10:00:00Z",
@@ -103,7 +103,7 @@ test("retention consumes parsed snapshots and keeps newest per UTC period", () =
 test("retention keeps 14 daily, 8 weekly, 12 monthly, and 5 yearly periods", () =>
   Effect.runPromise(
     Effect.gen(function* () {
-      const job = yield* Schema.decodeUnknownEffect(JobName)("test-job");
+      const job = yield* Schema.decodeEffect(JobName)("test-job");
       const start = DateTime.makeUnsafe("2020-01-01T00:00:00Z");
       const cases = [
         { unit: "days", count: 14, policy: "daily", step: 1 },

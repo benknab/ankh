@@ -11,7 +11,7 @@ export const archiveName = (job: JobName, time: DateTime.Utc): ArchiveName =>
   archiveFileName(`${job}-${DateTime.formatIso(time).replace(/[-:.]/g, "")}.tar.zst`);
 
 export const archiveTime = (job: JobName, name: string): Option.Option<DateTime.Utc> => {
-  if (Option.isNone(Schema.decodeUnknownOption(ArchiveName)(name))) {
+  if (Option.isNone(Schema.decodeOption(ArchiveName)(name))) {
     return Option.none();
   }
   const match = name.match(

@@ -21,7 +21,7 @@ export class Storage extends Context.Service<
 
 export const loadJob = Effect.fn("loadJob")(function* (file: AbsolutePath) {
   const { fs } = yield* Storage;
-  return yield* Schema.decodeUnknownEffect(JobJson)(yield* fs.readFileString(file));
+  return yield* Schema.decodeEffect(JobJson)(yield* fs.readFileString(file));
 });
 
 export const checkDrive = Effect.fn("checkDrive")(function* (job: Job) {

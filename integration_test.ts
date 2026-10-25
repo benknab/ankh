@@ -217,7 +217,7 @@ test.skipIf(process.env.BACKUP_INTEGRATION !== "1")(
           path.join(stage, "test.db"),
           "CREATE TABLE records(value TEXT); INSERT INTO records VALUES ('verified');",
         ]);
-        const destination = yield* Schema.decodeUnknownEffect(Proton)({
+        const destination = yield* Schema.decodeEffect(Proton)({
           type: "proton-drive",
           outbox: queuePath,
           remoteFolder: "/my-files/Test Backups",
