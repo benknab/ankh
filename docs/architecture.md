@@ -32,13 +32,18 @@ See [operations](operations.md#outbox-transitions) for state and recovery rules.
 ## Execution telemetry
 
 `src/telemetry/` gives each command or scheduled backup a run ID and an Effect
-service with run-local counters. Child fibers share that service. Concurrent runs
+service with run-local counters and a bounded log collector. Child fibers share
+that service. Concurrent runs
 have separate state. Clock supplies durations; log annotations and spans carry
 the ID through each step.
 
 After cleanup, one `execution.completed` event reports success, failure, or
 interruption. Step summaries include both destination results and process counts.
-Info and debug logger layers select completion-only or detailed progress output.
+Normal Effect log calls append messages or merge custom fields into that event.
+Debug mode collects more detail but still emits once. Service layers capture only
+their dependencies so they preserve the caller's logger and trace context.
+Effect's OTLP logger and tracer export the event and correlated spans. A small
+serialization layer removes generated exception text before JSON encoding.
 See [logging](operations.md#logs) for fields and configuration.
 
 Tests replace services with Layers. Unit tests use TestClock; integration tests

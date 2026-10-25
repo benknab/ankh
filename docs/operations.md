@@ -89,18 +89,65 @@ check. Authentication or network errors during discovery do not create folders.
 The default info layer writes one JSON completion line for each command or
 scheduled backup. The event is in `message`, with `event: execution.completed`.
 It contains `runId`, `operation`, `status`, `durationMs`, job/source details when
-known, and step summaries. Each step records attempts, failures, interruptions,
+known, `traceId`, `spanId`, custom `messages` and `data`, and step summaries.
+Each step records attempts, failures, interruptions,
 and elapsed time. `restic` and `proton-drive` are separate destination steps.
 
-Set `BACKUP_LOG_LEVEL=debug` in the container to add step start/end events.
-All events in one run have the same `annotations.runId`. Each scheduled attempt
-gets a new ID. Concurrent runs have separate counters. Cleanup finishes before
+Set `BACKUP_LOG_LEVEL=debug` to collect debug messages and step start/end details
+in that same event. It still writes one line. Each scheduled attempt gets a new
+ID. Concurrent runs have separate state. Cleanup finishes before
 the completion event. A forced kill or power loss cannot emit a completion event.
 
 Failure fields contain a safe category and an exit code when available. Logs omit
 arguments, credentials, tool output, and raw error causes. Interactive Proton login
 still displays the official CLI prompts. Command results keep bounded diagnostics
 internally: a 64 KiB tail, or up to 16 MiB of text for output that clients parse.
+
+### Custom messages and fields
+
+Use normal Effect logging inside `withExecution(operation, effect)`:
+
+```ts
+yield * Effect.logInfo("Source staged", { files: 12 });
+yield * Effect.logInfo({ uploaded: 8 });
+yield * Effect.logInfo("Upload finished", { uploaded: 12 });
+```
+
+The completion event contains two messages and `data: { files: 12, uploaded: 12 }`.
+Object fields merge at the top level; the last value wins. Custom data cannot
+overwrite the run's status or IDs. Message entries keep their level and log
+annotations. A logged Cause adds a safe failure category, without error text.
+Outside an execution, Effect logs go straight to the configured loggers.
+
+Each run keeps up to 100 messages and 100 data fields. Drop counters report excess
+messages and top-level fields. Each object accepts 40 fields, arrays keep 20 items,
+strings keep 2048 characters, keys keep 128 characters, and nested containers stop
+at depth three. Secret field names and Effect `Redacted` values are masked. Raw
+errors are replaced. Use safe message text; text cannot identify secrets on its own.
+
+### OpenTelemetry
+
+Enable Effect's OTLP logs and traces with container environment variables:
+
+```sh
+OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4318
+OTEL_LOGS_EXPORTER=otlp
+OTEL_TRACES_EXPORTER=otlp
+```
+
+The runner sends HTTP/JSON to `/v1/logs` and `/v1/traces`. Export is off by default;
+`OTEL_SDK_DISABLED=true` also disables it. Console JSON output stays enabled.
+Effect supports signal-specific endpoints, headers, timeouts, batch settings,
+and `OTEL_RESOURCE_ATTRIBUTES`. The service name is `backup-runner`.
+
+The completed log and execution span share trace/span IDs. Child spans show
+individual operations. The standard Effect exporters batch data and flush on
+normal shutdown. Export failures do not fail a backup. Telemetry is best effort;
+failed exports and forced process exits can lose data.
+
+The trace serializer removes generated exception details and status messages.
+Exporter debug diagnostics are suppressed because they can contain request data.
+Keep custom span names, attributes, and events free of credentials and tool output.
 
 ## Verification scope
 
