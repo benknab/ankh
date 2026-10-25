@@ -76,6 +76,34 @@ it.effect("Proton folders validate every segment including one-character names",
   }),
 );
 
+it.effect("configuration reserves the drive lock path for cleanup", () =>
+  Effect.gen(function* () {
+    for (const root of ["/drive/.runner-lock", "/drive/.runner-lock/nested"]) {
+      for (const destination of [
+        { type: "restic", repository: root, passwordFile: "/password" },
+        { type: "proton-drive", outbox: root, remoteFolder: "/my-files/a" },
+      ]) {
+        expect(
+          Result.isFailure(
+            yield* Schema.decodeUnknownEffect(Job)({
+              ...fixture,
+              destinations: [destination],
+            }).pipe(Effect.result),
+          ),
+        ).toBe(true);
+      }
+      expect(
+        Result.isFailure(
+          yield* Schema.decodeUnknownEffect(Job)({
+            ...fixture,
+            source: { ...fixture.source, path: root },
+          }).pipe(Effect.result),
+        ),
+      ).toBe(true);
+    }
+  }),
+);
+
 it.effect("Gitea URLs reject credentials, queries, and fragments", () =>
   Effect.gen(function* () {
     for (const apiUrl of [

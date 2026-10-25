@@ -30,6 +30,8 @@ export const AbsolutePath = Schema.String.check(
 ).pipe(Schema.brand("AbsolutePath"));
 export type AbsolutePath = typeof AbsolutePath.Type;
 export const absolutePath = Brand.nominal<AbsolutePath>();
+export const driveLockPath = (sentinel: AbsolutePath): AbsolutePath =>
+  absolutePath(`${sentinel.slice(0, sentinel.lastIndexOf("/"))}/.runner-lock`);
 export const RemoteFolder = Schema.String.check(
   Schema.isPattern(/^\/my-files\/(?!.*(?:^|\/)\.\.?($|\/))[^/\\\0]+(?:\/[^/\\\0]+)*$/u),
 ).pipe(Schema.brand("RemoteFolder"));
@@ -147,7 +149,10 @@ export const Job = Schema.Struct({
       return (
         Array.every(
           [...inputs, ...outputs],
-          (p) => !overlaps(p, "/staging") && !overlaps(p, "/proton"),
+          (p) =>
+            !overlaps(p, "/staging") &&
+            !overlaps(p, "/proton") &&
+            !overlaps(p, driveLockPath(job.backupDrive.sentinelFile)),
         ) &&
         Array.every(
           outputs,
