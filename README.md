@@ -1,6 +1,6 @@
 # Ankh
 
-Ankh is an unpublished prototype used by its maintainer to back up personal
+Ankh is an unpublished prototype for backing up personal
 self-hosted applications to a hard drive and to remote storage on Proton Drive.
 It has no published release and is neither tested nor optimized for large data
 sets. The source is available under the MIT license as a starting point for forks.
