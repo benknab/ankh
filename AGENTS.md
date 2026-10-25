@@ -56,7 +56,24 @@ Run `pnpm fmt <paths>` to format changed files or `pnpm fmt:check <paths>` to ch
 them. `pnpm check` includes the formatting check. Keep formatting scoped to the
 files being changed; the generated lockfile is excluded.
 
-Build the container and its `test` target, then run its integration tests when changing process or filesystem
-behavior. Test scheduling with Effect's TestClock, including timezone handling
-and failure recovery. Enable scheduled services only after real backups and
-restores pass for every opted-in app.
+## Tests
+
+- Put isolated tests in `tests/**/*.unit.test.ts`. `pnpm test` and `pnpm test:unit`
+  run only the unit project; additional file filters are accepted.
+- Put tests using real processes, filesystems, databases, or external tools in
+  `tests/**/*.integration.test.ts`. Do not gate tests with environment variables.
+- `pnpm test:integration` requires a running Docker daemon and Compose. It builds
+  the Dockerfile's `test` target, starts a disposable PostgreSQL service, waits for
+  readiness, and runs every integration test in the Linux/amd64 container. Data
+  and credentials live in temporary filesystems; each run has its own Compose
+  project. Cleanup runs on success, failure, or interruption.
+- Pass file filters or Vitest options to that script to target tests, for example
+  `pnpm test:integration tests/postgres.integration.test.ts`.
+- `pnpm test:integration:run` is the inner runner for an already prepared
+  environment. It runs tests directly and does not provision dependencies.
+- `pnpm test:all` runs both suites. Full integration tests use real local tools
+  and PostgreSQL, with a simulated Proton service and no account credentials.
+
+Run integration tests when changing process or filesystem behavior. Test scheduling
+with Effect's TestClock, including timezone handling and failure recovery. Enable
+scheduled services only after real backups and restores pass for every opted-in app.

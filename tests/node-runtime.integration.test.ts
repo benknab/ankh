@@ -1,20 +1,16 @@
-import { NodeServices } from "@effect/platform-node";
 import { it } from "@effect/vitest";
-import { Effect, Layer, Result, Schema } from "effect";
-import { Commands } from "./src/commands.ts";
-import { Actions, BackupError, Job } from "./src/model.ts";
-import { Storage, withLock } from "./src/storage.ts";
-import { assert, fixture } from "./test-support.ts";
-
-const infrastructure = Layer.mergeAll(Commands.layer, Storage.layer).pipe(
-  Layer.provideMerge(NodeServices.layer),
-);
+import { Effect, Result, Schema } from "effect";
+import { Commands } from "../src/commands.ts";
+import { Actions, BackupError, Job } from "../src/model.ts";
+import { Storage, withLock } from "../src/storage.ts";
+import { infrastructure } from "./integration-support.ts";
+import { assert, fixture } from "./support.ts";
 
 it.live("Node runs the TypeScript CLI and rejects unsafe job paths", () =>
   Effect.gen(function* () {
     const commands = yield* Commands;
     const { path } = yield* Storage;
-    const entry = path.join(import.meta.dirname, "main.ts");
+    const entry = path.join(import.meta.dirname, "..", "main.ts");
     const help = yield* commands.run(process.execPath, [entry, "--help"]);
     for (const action of [...Actions, "schedule", "proton-login"]) {
       yield* assert(help.includes(action), `missing subcommand: ${action}`);

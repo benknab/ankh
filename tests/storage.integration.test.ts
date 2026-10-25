@@ -1,0 +1,47 @@
+import { it } from "@effect/vitest";
+import { Deferred, Effect, Fiber, Ref, Schema } from "effect";
+import { Job } from "../src/model.ts";
+import { Storage, withLock } from "../src/storage.ts";
+import { infrastructure } from "./integration-support.ts";
+import { assert, fixture } from "./support.ts";
+
+it.live("concurrent scheduled jobs wait for the shared drive lock", () =>
+  Effect.gen(function* () {
+    const { fs, path } = yield* Storage;
+    const root = yield* fs.makeTempDirectoryScoped();
+    const job = yield* Schema.decodeUnknownEffect(Job)({
+      ...fixture,
+      backupDrive: {
+        ...fixture.backupDrive,
+        sentinelFile: path.join(root, ".sentinel"),
+      },
+    });
+    const held = yield* Deferred.make<void>();
+    const release = yield* Deferred.make<void>();
+    const acquired = yield* Ref.make(false);
+    const first = yield* Effect.forkChild(
+      Effect.gen(function* () {
+        yield* withLock(job);
+        yield* Deferred.succeed(held, undefined);
+        yield* Deferred.await(release);
+      }).pipe(Effect.scoped),
+    );
+    yield* Deferred.await(held);
+    const second = yield* Effect.forkChild(
+      Effect.gen(function* () {
+        yield* withLock(job);
+        yield* Ref.set(acquired, true);
+      }).pipe(Effect.scoped),
+    );
+    yield* Effect.sleep("100 millis");
+    yield* assert(!(yield* Ref.get(acquired)), "another job must not enter while lock is held");
+    yield* Deferred.succeed(release, undefined);
+    yield* Fiber.join(first);
+    yield* Fiber.join(second);
+    yield* assert(yield* Ref.get(acquired), "waiting job must acquire released lock");
+    yield* assert(
+      !(yield* fs.exists(path.join(root, ".runner-lock"))),
+      "both scopes must release the lock",
+    );
+  }).pipe(Effect.provide(infrastructure)),
+);
