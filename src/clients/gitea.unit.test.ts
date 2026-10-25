@@ -66,3 +66,32 @@ it.effect("Gitea HTTP failures remain typed failures", () =>
     }
   }),
 );
+
+it.effect("Gitea continues through server-capped pages until an empty page", () =>
+  Effect.gen(function* () {
+    let page = 0;
+    const transport = HttpClient.make(
+      Effect.fn("Test.cappedPages")(function* (request) {
+        page += 1;
+        const count = page === 1 ? 20 : page === 2 ? 5 : 0;
+        const body = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(
+          count === 0
+            ? []
+            : Array.makeBy(count, (n) => ({ full_name: `owner/page-${page}-repo-${n}` })),
+        ).pipe(Effect.orDie);
+        return HttpClientResponse.fromWeb(request, new Response(body));
+      }),
+    );
+    const repositories = yield* Effect.gen(function* () {
+      return yield* (yield* GiteaClient).repositories(yield* source);
+    }).pipe(
+      Effect.provide(
+        GiteaClient.layer.pipe(
+          Layer.provide(Layer.merge(storage, Layer.succeed(HttpClient.HttpClient, transport))),
+        ),
+      ),
+    );
+    expect(repositories).toHaveLength(25);
+    expect(page).toBe(3);
+  }),
+);

@@ -39,7 +39,7 @@ export class GiteaClient extends Context.Service<
             });
             const batch = yield* HttpClientResponse.schemaBodyJson(Repositories)(response);
             result.push(...batch);
-            if (batch.length < 50) {
+            if (batch.length === 0) {
               return result;
             }
           }

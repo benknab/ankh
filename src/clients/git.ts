@@ -36,6 +36,11 @@ export class GitClient extends Context.Service<
           if (yield* storage.fs.exists(repository.mirror)) {
             yield* commands.run(
               "git",
+              ["-C", repository.mirror, "remote", "set-url", "origin", repository.url],
+              options,
+            );
+            yield* commands.run(
+              "git",
               ["-C", repository.mirror, "remote", "update", "--prune"],
               options,
             );

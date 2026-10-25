@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { Effect, Layer, Schema } from "effect";
+import { Array, Effect, Layer, Schema } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
 import { Commands } from "#process/commands.ts";
 import { Job } from "#domain/model.ts";
@@ -39,9 +39,17 @@ it.live("Gitea staging updates a persistent mirror and restores Git and LFS cont
       Effect.succeed(
         HttpClientResponse.fromWeb(
           request,
-          new Response('[{"full_name":"example/repository"}]', {
-            headers: { "content-type": "application/json" },
-          }),
+          new Response(
+            Array.some(
+              Array.fromIterable(request.urlParams),
+              ([key, value]) => key === "page" && value === "1",
+            )
+              ? '[{"full_name":"example/repository"}]'
+              : "[]",
+            {
+              headers: { "content-type": "application/json" },
+            },
+          ),
         ),
       ),
     );
@@ -61,7 +69,9 @@ it.live("Gitea staging updates a persistent mirror and restores Git and LFS cont
                 options,
               );
             })
-          : commands.run(binary, args, options),
+          : binary === "git" && args.includes("set-url")
+            ? commands.run(binary, [...args.slice(0, -1), repository], options)
+            : commands.run(binary, args, options),
     });
     const sources = Sources.layer.pipe(
       Layer.provide(
