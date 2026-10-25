@@ -9,4 +9,5 @@ upload queue. Failed uploads stay on disk for retry, and a failed destination
 doesn't prevent backups to the other destinations.
 
 [Quickstart](docs/quickstart.md) · [Configuration](docs/configuration.md) ·
-[Operations](docs/operations.md) · [Restores](docs/restores.md)
+[Operations](docs/operations.md) · [Restores](docs/restores.md) ·
+[Architecture](docs/architecture.md)
