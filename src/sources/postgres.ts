@@ -1,8 +1,8 @@
 import { Effect } from "effect";
-import { Commands } from "../process/commands.ts";
-import { type AbsolutePath, BackupError, type Postgres } from "../domain/model.ts";
-import { Storage } from "../storage/storage.ts";
-import { freshStage } from "./stage.ts";
+import { Commands } from "#process/commands.ts";
+import { type AbsolutePath, BackupError, type Postgres } from "#domain/model.ts";
+import { Storage } from "#storage/storage.ts";
+import { freshStage } from "#sources/stage.ts";
 
 export const stagePostgres = Effect.fn("Postgres.stage")(function* (
   source: typeof Postgres.Type,

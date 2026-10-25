@@ -1,8 +1,8 @@
 import { it } from "@effect/vitest";
 import { Effect, Result } from "effect";
-import { Commands } from "./commands.ts";
-import { infrastructure } from "../testing/infrastructure.ts";
-import { assert } from "../testing/fixtures.ts";
+import { Commands } from "#process/commands.ts";
+import { infrastructure } from "#testing/infrastructure.ts";
+import { assert } from "#testing/fixtures.ts";
 
 it.live("Commands drains stdout and stderr and rejects nonzero exits", () =>
   Effect.gen(function* () {

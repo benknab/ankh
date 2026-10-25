@@ -5,13 +5,13 @@ import {
   type Destination,
   type DestinationRequest,
   type Job,
-} from "../domain/model.ts";
-import { Commands } from "../process/commands.ts";
-import { Outbox } from "../outbox/outbox.ts";
-import { ProtonDrive } from "../clients/proton/client.ts";
-import { runProton } from "./proton.ts";
-import { runRestic } from "./restic.ts";
-import { Storage } from "../storage/storage.ts";
+} from "#domain/model.ts";
+import { Commands } from "#process/commands.ts";
+import { Outbox } from "#outbox/outbox.ts";
+import { ProtonDrive } from "#clients/proton/client.ts";
+import { runProton } from "#destinations/proton.ts";
+import { runRestic } from "#destinations/restic.ts";
+import { Storage } from "#storage/storage.ts";
 
 export class Destinations extends Context.Service<
   Destinations,

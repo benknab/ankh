@@ -1,12 +1,12 @@
 import { it } from "@effect/vitest";
 import { DateTime, Effect, HashSet, Ref, Result, Schema } from "effect";
-import { BackupError, Job, Proton } from "../domain/model.ts";
-import { ProtonDrive } from "../clients/proton/client.ts";
-import { retainProton } from "./proton-retention.ts";
-import { archiveName } from "../domain/archive.ts";
-import { Storage } from "../storage/storage.ts";
-import { infrastructure } from "../testing/infrastructure.ts";
-import { assert, fixture } from "../testing/fixtures.ts";
+import { BackupError, Job, Proton } from "#domain/model.ts";
+import { ProtonDrive } from "#clients/proton/client.ts";
+import { retainProton } from "#destinations/proton-retention.ts";
+import { archiveName } from "#domain/archive.ts";
+import { Storage } from "#storage/storage.ts";
+import { infrastructure } from "#testing/infrastructure.ts";
+import { assert, fixture } from "#testing/fixtures.ts";
 
 it.live("retention retries only journaled partial deletions and rejects unrelated orphans", () =>
   Effect.gen(function* () {

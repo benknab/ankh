@@ -1,14 +1,14 @@
 import { Effect, Result } from "effect";
-import { Destinations } from "../destinations/destinations.ts";
+import { Destinations } from "#destinations/destinations.ts";
 import {
   type AbsolutePath,
   type Action,
   BackupError,
   type DestinationRequest,
   type Job,
-} from "../domain/model.ts";
-import { Sources } from "../sources/sources.ts";
-import { checkDrive, loadJob, withLock } from "../storage/storage.ts";
+} from "#domain/model.ts";
+import { Sources } from "#sources/sources.ts";
+import { checkDrive, loadJob, withLock } from "#storage/storage.ts";
 
 export const execute = Effect.fn("Runner.execute")(function* (job: Job, action: Action) {
   const destinations = yield* Destinations;

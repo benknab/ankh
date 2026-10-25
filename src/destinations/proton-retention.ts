@@ -1,9 +1,9 @@
 import { Effect, HashSet, Option, Schema } from "effect";
-import { ArchiveName, BackupError, type Job, type Proton, RemoteFolder } from "../domain/model.ts";
-import { ProtonDrive } from "../clients/proton/client.ts";
-import { archiveTime } from "../domain/archive.ts";
-import { expiredSnapshots, parseSnapshotPairs } from "../domain/retention.ts";
-import { privateDirectory, Storage } from "../storage/storage.ts";
+import { ArchiveName, BackupError, type Job, type Proton, RemoteFolder } from "#domain/model.ts";
+import { ProtonDrive } from "#clients/proton/client.ts";
+import { archiveTime } from "#domain/archive.ts";
+import { expiredSnapshots, parseSnapshotPairs } from "#domain/retention.ts";
+import { privateDirectory, Storage } from "#storage/storage.ts";
 
 const Intent = Schema.fromJsonString(
   Schema.Struct({

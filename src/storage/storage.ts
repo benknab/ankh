@@ -1,5 +1,5 @@
 import { Context, Effect, FileSystem, Layer, Path, Ref, Schedule, Schema } from "effect";
-import { type AbsolutePath, BackupError, backupError, type Job, JobJson } from "../domain/model.ts";
+import { type AbsolutePath, BackupError, backupError, type Job, JobJson } from "#domain/model.ts";
 
 export class Storage extends Context.Service<
   Storage,

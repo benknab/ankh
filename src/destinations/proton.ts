@@ -1,9 +1,9 @@
 import { Effect } from "effect";
-import { BackupError, type DestinationRequest, type Job, type Proton } from "../domain/model.ts";
-import { Outbox } from "../outbox/outbox.ts";
-import { ProtonDrive } from "../clients/proton/client.ts";
-import { retainProton } from "./proton-retention.ts";
-import { parseSnapshotPairs } from "../domain/retention.ts";
+import { BackupError, type DestinationRequest, type Job, type Proton } from "#domain/model.ts";
+import { Outbox } from "#outbox/outbox.ts";
+import { ProtonDrive } from "#clients/proton/client.ts";
+import { retainProton } from "#destinations/proton-retention.ts";
+import { parseSnapshotPairs } from "#domain/retention.ts";
 
 export const runProton = Effect.fn("Proton.run")(function* (
   job: Job,

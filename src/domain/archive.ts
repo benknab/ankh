@@ -1,5 +1,5 @@
 import { DateTime, Option, Schema } from "effect";
-import { type AbsolutePath, archiveFileName, ArchiveName, type JobName } from "./model.ts";
+import { type AbsolutePath, archiveFileName, ArchiveName, type JobName } from "#domain/model.ts";
 
 export type Archive = {
   readonly name: ArchiveName;

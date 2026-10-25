@@ -1,8 +1,8 @@
 import { Effect } from "effect";
-import { Commands } from "../process/commands.ts";
-import { type AbsolutePath, BackupError, type Sqlite } from "../domain/model.ts";
-import { freshStage } from "./stage.ts";
-import { Storage } from "../storage/storage.ts";
+import { Commands } from "#process/commands.ts";
+import { type AbsolutePath, BackupError, type Sqlite } from "#domain/model.ts";
+import { freshStage } from "#sources/stage.ts";
+import { Storage } from "#storage/storage.ts";
 
 export const stageSqlite = Effect.fn("Sqlite.stage")(function* (
   source: typeof Sqlite.Type,

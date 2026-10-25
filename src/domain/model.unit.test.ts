@@ -1,7 +1,7 @@
 import { it } from "@effect/vitest";
 import { Effect, Result, Schema } from "effect";
-import { Job, RemoteFolder } from "./model.ts";
-import { assert, fixture } from "../testing/fixtures.ts";
+import { Job, RemoteFolder } from "#domain/model.ts";
+import { assert, fixture } from "#testing/fixtures.ts";
 
 it.effect("configuration rejects unknown keys, invalid schedules, and destructive overlaps", () =>
   Effect.gen(function* () {

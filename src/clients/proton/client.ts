@@ -1,9 +1,9 @@
 import { Context, Effect, HashSet, Layer, Schema } from "effect";
-import { Commands } from "../../process/commands.ts";
-import { type ArchiveName, BackupError, backupError, type Proton } from "../../domain/model.ts";
-import { type Archive } from "../../domain/archive.ts";
+import { Commands } from "#process/commands.ts";
+import { type ArchiveName, BackupError, backupError, type Proton } from "#domain/model.ts";
+import { type Archive } from "#domain/archive.ts";
 
-import { protonEnvironment } from "./state.ts";
+import { protonEnvironment } from "#clients/proton/state.ts";
 
 const Folders = Schema.fromJsonString(
   Schema.Array(

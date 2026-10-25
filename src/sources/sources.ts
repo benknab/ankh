@@ -1,17 +1,17 @@
 import { Context, Effect, Layer } from "effect";
 import { HttpClient } from "effect/http";
-import { Commands } from "../process/commands.ts";
+import { Commands } from "#process/commands.ts";
 import {
   type AbsolutePath,
   absolutePath,
   type BackupError,
   backupError,
   type Job,
-} from "../domain/model.ts";
-import { stageGitea } from "./gitea.ts";
-import { stagePostgres } from "./postgres.ts";
-import { stageSqlite } from "./sqlite.ts";
-import { Storage } from "../storage/storage.ts";
+} from "#domain/model.ts";
+import { stageGitea } from "#sources/gitea.ts";
+import { stagePostgres } from "#sources/postgres.ts";
+import { stageSqlite } from "#sources/sqlite.ts";
+import { Storage } from "#storage/storage.ts";
 
 const stage = Effect.fn("Sources.stage")(
   function* (job: Job) {

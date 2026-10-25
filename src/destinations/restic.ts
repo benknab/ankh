@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect";
-import { Commands, type Options } from "../process/commands.ts";
-import { type DestinationRequest, type Job, type Restic } from "../domain/model.ts";
-import { Storage } from "../storage/storage.ts";
+import { Commands, type Options } from "#process/commands.ts";
+import { type DestinationRequest, type Job, type Restic } from "#domain/model.ts";
+import { Storage } from "#storage/storage.ts";
 
 export const runRestic = Effect.fn("Restic.run")(function* (
   job: Job,

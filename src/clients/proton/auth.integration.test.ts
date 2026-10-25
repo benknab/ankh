@@ -1,11 +1,11 @@
 import { it } from "@effect/vitest";
 import { Effect } from "effect";
-import { login } from "./auth.ts";
-import { Commands } from "../../process/commands.ts";
-import { protonEnvironment } from "./state.ts";
-import { Storage } from "../../storage/storage.ts";
-import { infrastructure } from "../../testing/infrastructure.ts";
-import { assert } from "../../testing/fixtures.ts";
+import { login } from "#clients/proton/auth.ts";
+import { Commands } from "#process/commands.ts";
+import { protonEnvironment } from "#clients/proton/state.ts";
+import { Storage } from "#storage/storage.ts";
+import { infrastructure } from "#testing/infrastructure.ts";
+import { assert } from "#testing/fixtures.ts";
 
 it.live("Proton credential setup creates a usable encryption key", () =>
   Effect.gen(function* () {

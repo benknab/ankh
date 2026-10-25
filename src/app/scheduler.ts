@@ -1,7 +1,7 @@
 import { Effect, Schedule } from "effect";
-import { type AbsolutePath, defaultSchedule, type JobSchedule } from "../domain/model.ts";
-import { runJob } from "./runner.ts";
-import { loadJob } from "../storage/storage.ts";
+import { type AbsolutePath, defaultSchedule, type JobSchedule } from "#domain/model.ts";
+import { runJob } from "#app/runner.ts";
+import { loadJob } from "#storage/storage.ts";
 
 export const scheduledAttempts = <E, R>(
   backup: Effect.Effect<void, E, R>,

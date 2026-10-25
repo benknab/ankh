@@ -10,7 +10,7 @@ import {
   Schema,
   Stream,
 } from "effect";
-import { Commands } from "../process/commands.ts";
+import { Commands } from "#process/commands.ts";
 import {
   type AbsolutePath,
   absolutePath,
@@ -19,9 +19,9 @@ import {
   backupError,
   type Job,
   type Proton,
-} from "../domain/model.ts";
-import { type Archive, archiveName, archiveTime } from "../domain/archive.ts";
-import { privateDirectory, Storage } from "../storage/storage.ts";
+} from "#domain/model.ts";
+import { type Archive, archiveName, archiveTime } from "#domain/archive.ts";
+import { privateDirectory, Storage } from "#storage/storage.ts";
 
 const verify = Effect.fn("Outbox.verify")(function* (archive: Archive) {
   const { fs } = yield* Storage;

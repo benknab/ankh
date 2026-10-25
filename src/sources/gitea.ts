@@ -1,8 +1,8 @@
 import { DateTime, Effect, Schema } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
-import { Commands, type Options } from "../process/commands.ts";
-import { type AbsolutePath, type Gitea } from "../domain/model.ts";
-import { privateDirectory, Storage } from "../storage/storage.ts";
+import { Commands, type Options } from "#process/commands.ts";
+import { type AbsolutePath, type Gitea } from "#domain/model.ts";
+import { privateDirectory, Storage } from "#storage/storage.ts";
 
 const Repositories = Schema.Array(
   Schema.Struct({

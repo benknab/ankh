@@ -1,9 +1,9 @@
 import { it } from "@effect/vitest";
 import { DateTime, Effect, Fiber, Ref } from "effect";
 import { TestClock } from "effect/testing";
-import { BackupError } from "../domain/model.ts";
-import { scheduledAttempts } from "./scheduler.ts";
-import { assert } from "../testing/fixtures.ts";
+import { BackupError } from "#domain/model.ts";
+import { scheduledAttempts } from "#app/scheduler.ts";
+import { assert } from "#testing/fixtures.ts";
 
 for (const [season, utcHour] of [
   ["2026-09-20", "03"],

@@ -1,8 +1,8 @@
 import { Effect } from "effect";
-import { Commands } from "../../process/commands.ts";
-import { BackupError } from "../../domain/model.ts";
-import { protonEnvironment, protonPaths } from "./state.ts";
-import { privateDirectory, Storage } from "../../storage/storage.ts";
+import { Commands } from "#process/commands.ts";
+import { BackupError } from "#domain/model.ts";
+import { protonEnvironment, protonPaths } from "#clients/proton/state.ts";
+import { privateDirectory, Storage } from "#storage/storage.ts";
 
 export const login = Effect.fn("Proton.login")(function* () {
   const commands = yield* Commands;

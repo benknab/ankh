@@ -1,10 +1,10 @@
 import { it } from "@effect/vitest";
 import { DateTime, Effect, HashSet, Layer, Ref, Result, Schema } from "effect";
-import { Commands } from "../../process/commands.ts";
-import { absolutePath, BackupError, JobName, Proton } from "../../domain/model.ts";
-import { ProtonDrive } from "./client.ts";
-import { archiveName } from "../../domain/archive.ts";
-import { assert } from "../../testing/fixtures.ts";
+import { Commands } from "#process/commands.ts";
+import { absolutePath, BackupError, JobName, Proton } from "#domain/model.ts";
+import { ProtonDrive } from "#clients/proton/client.ts";
+import { archiveName } from "#domain/archive.ts";
+import { assert } from "#testing/fixtures.ts";
 
 const destination = Schema.decodeSync(Proton)({
   type: "proton-drive",

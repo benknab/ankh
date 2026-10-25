@@ -1,6 +1,6 @@
 import { Context, Effect, Layer, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
-import { BackupError, backupError } from "../domain/model.ts";
+import { BackupError, backupError } from "#domain/model.ts";
 
 export type Options = {
   readonly cwd?: string;

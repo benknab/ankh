@@ -1,12 +1,12 @@
 import { it } from "@effect/vitest";
 import { Effect, Layer, Schema } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
-import { Commands } from "../process/commands.ts";
-import { Job } from "../domain/model.ts";
-import { Sources } from "./sources.ts";
-import { Storage } from "../storage/storage.ts";
-import { infrastructure } from "../testing/infrastructure.ts";
-import { assert, fixture } from "../testing/fixtures.ts";
+import { Commands } from "#process/commands.ts";
+import { Job } from "#domain/model.ts";
+import { Sources } from "#sources/sources.ts";
+import { Storage } from "#storage/storage.ts";
+import { infrastructure } from "#testing/infrastructure.ts";
+import { assert, fixture } from "#testing/fixtures.ts";
 
 it.live("Gitea staging updates a persistent mirror and restores Git and LFS contents", () =>
   Effect.gen(function* () {

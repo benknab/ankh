@@ -13,6 +13,10 @@
     "url": "https://github.com/benknab/backup-runner.git"
   },
   "type": "module",
+  "imports": {
+    "#package": "./package.json",
+    "#*": "./src/*"
+  },
   "scripts": {
     "start": "node src/main.ts",
     "check": "pnpm fmt:check && pnpm lint && pnpm typecheck",

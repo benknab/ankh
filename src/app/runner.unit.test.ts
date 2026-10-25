@@ -1,13 +1,13 @@
 import { it } from "@effect/vitest";
 import { DateTime, Effect, HashSet, Layer, Ref, Result, Schema } from "effect";
-import { Destinations } from "../destinations/destinations.ts";
-import { absolutePath, BackupError, Job, JobName } from "../domain/model.ts";
-import { archiveName } from "../domain/archive.ts";
-import { expiredSnapshots, parseSnapshotPairs } from "../domain/retention.ts";
-import { execute } from "./runner.ts";
-import { Sources } from "../sources/sources.ts";
+import { Destinations } from "#destinations/destinations.ts";
+import { absolutePath, BackupError, Job, JobName } from "#domain/model.ts";
+import { archiveName } from "#domain/archive.ts";
+import { expiredSnapshots, parseSnapshotPairs } from "#domain/retention.ts";
+import { execute } from "#app/runner.ts";
+import { Sources } from "#sources/sources.ts";
 
-import { assert, fixture } from "../testing/fixtures.ts";
+import { assert, fixture } from "#testing/fixtures.ts";
 
 it.effect("schemas reject unsafe paths, names, duplicate destinations, and empty retention", () =>
   Effect.gen(function* () {
