@@ -50,7 +50,9 @@ its cron or time zone. Each run reloads other job settings.
 - Gitea: `type: "gitea-git"`, `apiUrl`, and `tokenFile`. Only HTTP(S) base URLs
   without embedded credentials, queries, or fragments are accepted. The API
   enumerates repositories visible to the token; Git and LFS use the same token
-  through askpass. Deleted or newly inaccessible repositories may remain in the
+  through origin-scoped askpass. LFS uses the configured repository's `/info/lfs`
+  endpoint; repository-supplied endpoints cannot override it. Use the final Gitea
+  URL: Git redirects are disabled. Deleted or newly inaccessible repositories may remain in the
   persistent mirror cache; `manifest.json` records the currently enumerated set.
 
 ## Destinations and paths

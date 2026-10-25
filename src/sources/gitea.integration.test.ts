@@ -58,8 +58,10 @@ it.live("Gitea staging updates a persistent mirror and restores Git and LFS cont
       ),
     );
     const testCommands = Commands.of({
-      run: (binary, args, options) =>
-        binary === "git" && args[0] === "clone"
+      run: (binary, args, options) => {
+        // Local fixture transport uses Git LFS's file adapter instead of HTTP.
+        const localOptions = { ...options, env: { ...options?.env, GIT_CONFIG_COUNT: "3" } };
+        return binary === "git" && args[0] === "clone"
           ? Effect.gen(function* () {
               expect(args[2], "clone URL must preserve the base path").toBe(
                 "https://example.com/gitea/example/repository.git",
@@ -70,12 +72,13 @@ it.live("Gitea staging updates a persistent mirror and restores Git and LFS cont
               return yield* commands.run(
                 binary,
                 ["clone", "--mirror", repository, target],
-                options,
+                localOptions,
               );
             })
           : binary === "git" && args.includes("set-url")
-            ? commands.run(binary, [...args.slice(0, -1), repository], options)
-            : commands.run(binary, args, options),
+            ? commands.run(binary, [...args.slice(0, -1), repository], localOptions)
+            : commands.run(binary, args, localOptions);
+      },
     });
     const sources = Sources.layer.pipe(
       Layer.provide(

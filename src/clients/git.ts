@@ -3,6 +3,7 @@ import { type AbsolutePath, backupError, type BackupError } from "#domain/model.
 import { Commands, type Options } from "#process/commands.ts";
 import { privateDirectory, Storage } from "#storage/storage.ts";
 import { verifyLfs } from "#clients/git-lfs.ts";
+import { gitOptions } from "#clients/git-auth.ts";
 
 export interface GitRepository {
   readonly url: string;
@@ -44,14 +45,7 @@ export class GitClient extends Context.Service<
       const storage = yield* Storage;
       const mirror = Effect.fn("GitClient.mirror")(
         function* (repository: GitRepository) {
-          const options: Options = {
-            output: "tail",
-            env: {
-              GIT_ASKPASS: "/app/gitea-askpass.sh",
-              GIT_TERMINAL_PROMPT: "0",
-              GITEA_TOKEN_FILE: repository.tokenFile,
-            },
-          };
+          const options = gitOptions(repository);
           yield* privateDirectory(storage.path.dirname(repository.mirror)).pipe(
             Effect.provideService(Storage, storage),
           );
