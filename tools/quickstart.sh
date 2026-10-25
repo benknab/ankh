@@ -35,7 +35,7 @@ printf 'serial=example-drive\nuuid=example-filesystem\n' > "$BACKUP_DIR/.sentine
 for action in validate init backup check-read-data; do
   "${compose[@]}" run --rm backup "$action"
 done
-"${compose[@]}" run --rm --volume "$state/restore:/restore" \
+"${compose[@]}" run --rm --cap-add CHOWN --cap-add FOWNER --volume "$state/restore:/restore" \
   --env RESTIC_REPOSITORY=/backups/restic --env RESTIC_PASSWORD_FILE=/secrets/restic-password \
   --env RESTIC_CACHE_DIR=/tmp/restic-cache \
   --entrypoint restic backup restore latest --target /restore

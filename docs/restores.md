@@ -16,6 +16,7 @@ docker compose -f examples/compose.yaml run --rm \
   --entrypoint restic backup snapshots --host example-host --tag job:example-job
 docker compose -f examples/compose.yaml run --rm \
   -v /path/to/restore:/restore \
+  --cap-add CHOWN --cap-add FOWNER \
   -e RESTIC_REPOSITORY=/backups/restic \
   -e RESTIC_PASSWORD_FILE=/secrets/restic-password \
   -e RESTIC_CACHE_DIR=/tmp/restic-cache \
