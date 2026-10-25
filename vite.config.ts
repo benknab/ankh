@@ -15,6 +15,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: "integration",
+          fsModuleCache: false,
           include: ["tests/**/*.integration.test.ts"],
           fileParallelism: false,
           testTimeout: 120_000,

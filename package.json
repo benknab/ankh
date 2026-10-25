@@ -35,12 +35,12 @@
     "@effect/tsgo": "0.53.1",
     "@effect/vitest": "4.0.2",
     "@types/node": "24.19.2",
-    "oxlint": "1.87.0",
-    "oxlint-tsgolint": "7.0.2003",
+    "oxlint": "1.88.0",
+    "oxlint-tsgolint": "7.0.2004",
     "typescript": "7.0.2",
-    "vite": "npm:@voidzero-dev/vite-plus-core@1.1.0",
-    "vite-plus": "1.1.0",
-    "vitest": "5.0.3"
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.3.0",
+    "vite-plus": "1.3.0",
+    "vitest": "5.0.5"
   },
   "engines": {
     "node": "24.22.1",
