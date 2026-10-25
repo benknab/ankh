@@ -3,6 +3,21 @@ import { Effect, Result, Schema } from "effect";
 import { Job, RemoteFolder } from "#domain/model.ts";
 import { fixture } from "#testing/fixtures.ts";
 
+it.effect("schemas reject unsafe paths, names, duplicate destinations, and empty retention", () =>
+  Effect.gen(function* () {
+    yield* Schema.decodeUnknownEffect(Job)(fixture);
+    for (const input of [
+      { ...fixture, name: "../escape" },
+      { ...fixture, source: { ...fixture.source, output: "../escape" } },
+      { ...fixture, destinations: [fixture.destinations[0], fixture.destinations[0]] },
+      { ...fixture, retention: { daily: 0, weekly: 0, monthly: 0, yearly: 0 } },
+    ]) {
+      const result = yield* Schema.decodeUnknownEffect(Job)(input).pipe(Effect.result);
+      expect(Result.isFailure(result), "invalid job must fail at the boundary").toBe(true);
+    }
+  }),
+);
+
 it.effect("configuration rejects unknown keys, invalid schedules, and destructive overlaps", () =>
   Effect.gen(function* () {
     for (const input of [
