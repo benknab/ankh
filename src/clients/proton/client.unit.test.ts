@@ -7,6 +7,7 @@ import {
   HashSet,
   Layer,
   Path,
+  Record,
   Redacted,
   Ref,
   Result,
@@ -121,12 +122,55 @@ it.effect("Proton commands run under the state lock with a pinned environment", 
   }),
 );
 
+it.effect("a passphrase file is passed to pass by path and must be one non-empty line", () =>
+  Effect.gen(function* () {
+    const destination = yield* destinationConfig;
+    const envs = yield* Ref.make<readonly Options["env"][]>([]);
+    const commands = Commands.of({
+      run: (_binary, _args, options) =>
+        Ref.update(envs, (all) => [...all, options?.env]).pipe(Effect.as(output("[]"))),
+    });
+    const run = (text: string): Effect.Effect<unknown, BackupError> =>
+      Effect.gen(function* () {
+        return yield* (yield* ProtonDrive).list(destination);
+      }).pipe(
+        Effect.provide(
+          protonLayer(commands, {
+            exists: () => Effect.succeed(true),
+            readFileString: () => Effect.succeed(text),
+          }),
+        ),
+      );
+    yield* run("correct horse\n");
+    const [env] = yield* Ref.get(envs);
+    expect(env).toMatchObject({
+      PASSWORD_STORE_GPG_OPTS:
+        "--pinentry-mode loopback --passphrase-file /secrets/proton-gpg-passphrase",
+    });
+    expect(
+      Array.some(
+        Record.values(env ?? {}),
+        (value) => Redacted.isRedacted(value) || value.includes("correct horse"),
+      ),
+      "the passphrase itself must never reach the environment",
+    ).toBe(false);
+    for (const [index, invalid] of ["", "\n", "two\nlines\n", "windows\r\n"].entries()) {
+      const result = yield* run(invalid).pipe(Effect.result);
+      expect(Result.isFailure(result), `invalid passphrase file ${index} must fail`).toBe(true);
+    }
+    expect(
+      yield* Ref.get(envs),
+      "invalid passphrase files must fail before any command",
+    ).toHaveLength(1);
+  }),
+);
+
 it.effect("Proton CLI failures are described without exposing tool output", () =>
   Effect.gen(function* () {
     const destination = yield* destinationConfig;
     const cases = [
       [failedExit(1, "You need to login first\n"), "run proton-login", 1],
-      [failedExit(1, "Failed to load session in pass: gpg: decryption failed"), "decrypt", 1],
+      [failedExit(1, "Failed to load session in pass: gpg: decryption failed"), "passphrase", 1],
       [failedExit(75, ""), "Proton state lock", undefined],
       [failedExit(1, "unexpected trace with secrets"), "proton-drive exited 1", 1],
     ] as const;

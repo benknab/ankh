@@ -1,7 +1,7 @@
 import { Array, Duration, Effect, Option, Predicate, Redacted } from "effect";
 import { BackupError } from "#domain/model.ts";
 import { type Argument, Commands } from "#process/commands.ts";
-import { ProtonState, protonEnvironment } from "#clients/proton/state.ts";
+import { keyProtection, ProtonState, protonEnvironment } from "#clients/proton/state.ts";
 
 const lockConflict = 75;
 
@@ -13,11 +13,12 @@ const diagnoses = [
   },
   {
     marker: "Failed to load session",
-    message: "Cannot decrypt the stored Proton session; run proton-login",
+    message:
+      "Cannot decrypt the stored Proton session; check the GPG passphrase file and run proton-login",
   },
   {
     marker: "Failed to save session",
-    message: "Cannot store the Proton session; run proton-login",
+    message: "Cannot store the Proton session; check the GPG passphrase file and run proton-login",
   },
 ] as const;
 
@@ -63,6 +64,7 @@ export const runProton = Effect.fn("Proton.command")(function* (
 ) {
   const commands = yield* Commands;
   const paths = yield* ProtonState;
+  const env = protonEnvironment(paths, yield* keyProtection());
   return yield* commands
     .run(
       "flock",
@@ -78,7 +80,7 @@ export const runProton = Effect.fn("Proton.command")(function* (
         binary,
         ...args,
       ],
-      { env: protonEnvironment(paths), interactive: options.interactive === true },
+      { env, interactive: options.interactive === true },
     )
     .pipe(Effect.mapError((error) => describe(binary, error, paths.lock)));
 });

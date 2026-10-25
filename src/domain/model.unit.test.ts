@@ -40,6 +40,10 @@ it.effect("configuration rejects unknown keys, invalid schedules, and destructiv
           { type: "proton-drive", remoteFolder: "/my-files/a", outbox: "/proton/queue" },
         ],
       },
+      {
+        ...fixture,
+        destinations: [{ type: "proton-drive", remoteFolder: "/my-files/a", outbox: "/secrets" }],
+      },
     ]) {
       expect(
         Result.isFailure(

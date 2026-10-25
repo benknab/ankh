@@ -1,6 +1,6 @@
 import { expect, it } from "@effect/vitest";
 import { Array, Effect, Result } from "effect";
-import { parseSecretKeys } from "#clients/proton/credentials.ts";
+import { parseProtection, parseSecretKeys } from "#clients/proton/credentials.ts";
 
 const primary = "930CF490C7E7D549C32269B5F69663CD9738BE10";
 const primaryGrip = "B30F89975CDFCF832544F1A734FB301A8929B2D7";
@@ -50,5 +50,26 @@ it.effect("GPG listings select only exact Ankh identities with primary fingerpri
       Effect.result,
     );
     expect(Result.isFailure(corrupt), "malformed fingerprints must fail closed").toBe(true);
+  }),
+);
+
+const row = (grip: string, protection: string): string =>
+  `S KEYINFO ${grip} D - - - ${protection} - - -`;
+
+it.effect("GPG agent key info distinguishes protected, unprotected, and mixed keys", () =>
+  Effect.gen(function* () {
+    const [key] = yield* parseSecretKeys(Array.join(ankhKey, "\n"));
+    if (key === undefined) {
+      return yield* Effect.die("fixture key must parse");
+    }
+    const info = (first: string, second: string): string =>
+      Array.join([row(primaryGrip, first), "OK", row(subkeyGrip, second), "OK", ""], "\n");
+    expect(yield* parseProtection(key, info("P", "P"))).toBe("protected");
+    expect(yield* parseProtection(key, info("C", "C"))).toBe("unprotected");
+    expect(yield* parseProtection(key, info("P", "C"))).toBe("mixed");
+    const missing = yield* parseProtection(key, `${row(primaryGrip, "P")}\nOK\n`).pipe(
+      Effect.result,
+    );
+    expect(Result.isFailure(missing), "every key part must be reported").toBe(true);
   }),
 );

@@ -3,7 +3,12 @@ import { Duration, Effect, Fiber, Redacted, Ref, Result } from "effect";
 import { login } from "#clients/proton/auth.ts";
 import { runProton } from "#clients/proton/command.ts";
 import { verifyCredentials } from "#clients/proton/credentials.ts";
-import { type ProtonPaths, ProtonState, protonEnvironment } from "#clients/proton/state.ts";
+import {
+  passphraseArguments,
+  type ProtonPaths,
+  ProtonState,
+  protonEnvironment,
+} from "#clients/proton/state.ts";
 import { absolutePath, type BackupError } from "#domain/model.ts";
 import { Commands, type Options } from "#process/commands.ts";
 import { Storage } from "#storage/storage.ts";
@@ -20,6 +25,7 @@ const isolated = Effect.fn("Test.isolatedProtonState")(function* () {
     passwordStore: absolutePath(path.join(root, "pass")),
     cache: absolutePath(path.join(root, "cache")),
     lock: absolutePath(path.join(root, "lock")),
+    passphraseFile: absolutePath(path.join(root, "proton-gpg-passphrase")),
     lockTimeout: Duration.seconds(1),
   };
   yield* Effect.addFinalizer(() =>
@@ -48,10 +54,16 @@ const stubbedLogin = Effect.fn("Test.stubbedLogin")(function* () {
   };
 });
 
+const stopAgent = Effect.fn("Test.stopAgent")(function* (paths: ProtonPaths) {
+  yield* (yield* Commands).run("gpgconf", ["--kill", "gpg-agent"], {
+    env: { GNUPGHOME: paths.gnupg },
+  });
+});
+
 const messageOf = (result: Result.Result<unknown, BackupError>): string =>
   Result.isFailure(result) ? result.failure.message : "";
 
-it.live("Proton credential setup creates a usable private store", () =>
+it.live("unprotected Proton credential setup creates a usable private store", () =>
   Effect.gen(function* () {
     const paths = yield* ProtonState;
     const { fs } = yield* Storage;
@@ -68,7 +80,7 @@ it.live("Proton credential setup creates a usable private store", () =>
       yield* fs.exists(`${paths.passwordStore}/ankh-probe.gpg`),
       "the store probe must be removed",
     ).toBe(false);
-    const env = protonEnvironment(paths);
+    const env = protonEnvironment(paths, { _tag: "None" });
     const probe = `${paths.cache}/probe`;
     yield* fs.writeFileString(probe, "credential-round-trip", { mode: 0o600 });
     yield* commands.run(
@@ -90,6 +102,58 @@ it.live("Proton credential setup creates a usable private store", () =>
   }).pipe(Effect.provideServiceEffect(ProtonState, isolated()), Effect.provide(infrastructure)),
 );
 
+it.live("a passphrase file protects new keys and must stay available", () =>
+  Effect.gen(function* () {
+    const paths = yield* ProtonState;
+    const { fs } = yield* Storage;
+    const { logins, run } = yield* stubbedLogin();
+    yield* fs.writeFileString(paths.passphraseFile, "correct horse battery\n", { mode: 0o600 });
+    yield* run;
+    yield* verifyCredentials();
+    yield* stopAgent(paths);
+    yield* fs.remove(paths.passphraseFile);
+    const verified = yield* verifyCredentials().pipe(Effect.result);
+    expect(messageOf(verified), "a missing passphrase file must fail closed").toContain(
+      "passphrase-protected",
+    );
+    const relogin = yield* run.pipe(Effect.result);
+    expect(messageOf(relogin), "login must never remove the passphrase").toContain(
+      "passphrase-protected",
+    );
+    expect(yield* Ref.get(logins), "failed setup must not start a browser login").toHaveLength(1);
+    yield* fs.writeFileString(paths.passphraseFile, "wrong passphrase\n", { mode: 0o600 });
+    const wrong = yield* run.pipe(Effect.result);
+    expect(Result.isFailure(wrong), "a wrong passphrase must fail the store probe").toBe(true);
+    expect(yield* Ref.get(logins)).toHaveLength(1);
+  }).pipe(Effect.provideServiceEffect(ProtonState, isolated()), Effect.provide(infrastructure)),
+);
+
+it.live("adding a passphrase file protects an existing key on the next login", () =>
+  Effect.gen(function* () {
+    const paths = yield* ProtonState;
+    const { fs } = yield* Storage;
+    const commands = yield* Commands;
+    const { run } = yield* stubbedLogin();
+    yield* run;
+    yield* runProton("pass", ["insert", "--force", "--multiline", "existing-entry"]);
+    yield* fs.writeFileString(paths.passphraseFile, "correct horse battery\n", { mode: 0o600 });
+    const stale = yield* verifyCredentials().pipe(Effect.result);
+    expect(messageOf(stale), "runs must not silently ignore a new passphrase").toContain(
+      "run proton-login",
+    );
+    yield* run;
+    yield* verifyCredentials();
+    yield* runProton("pass", ["show", "existing-entry"]);
+    yield* stopAgent(paths);
+    const unprotected = yield* commands
+      .run("pass", ["show", "existing-entry"], {
+        env: protonEnvironment(paths, { _tag: "None" }),
+      })
+      .pipe(Effect.result);
+    expect(Result.isFailure(unprotected), "the key must require the passphrase").toBe(true);
+  }).pipe(Effect.provideServiceEffect(ProtonState, isolated()), Effect.provide(infrastructure)),
+);
+
 it.live("a password store for another key fails before the browser login", () =>
   Effect.gen(function* () {
     const paths = yield* ProtonState;
@@ -104,18 +168,16 @@ it.live("a password store for another key fails before the browser login", () =>
   }).pipe(Effect.provideServiceEffect(ProtonState, isolated()), Effect.provide(infrastructure)),
 );
 
-it.live("a sign-only legacy key is repaired with an encryption subkey", () =>
+it.live("a sign-only legacy key is repaired under the configured passphrase", () =>
   Effect.gen(function* () {
     const paths = yield* ProtonState;
     const { fs } = yield* Storage;
     const { run } = yield* stubbedLogin();
+    yield* fs.writeFileString(paths.passphraseFile, "correct horse battery\n", { mode: 0o600 });
     yield* fs.makeDirectory(paths.gnupg, { mode: 0o700 });
     yield* runProton("gpg", [
       "--batch",
-      "--pinentry-mode",
-      "loopback",
-      "--passphrase",
-      "",
+      ...passphraseArguments({ _tag: "Passphrase", file: paths.passphraseFile }),
       "--quick-generate-key",
       "Backup Runner <backup-runner@localhost>",
       "ed25519",

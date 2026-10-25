@@ -32,6 +32,7 @@ export type AbsolutePath = typeof AbsolutePath.Type;
 export const absolutePath = Brand.nominal<AbsolutePath>();
 export const driveLockPath = (sentinel: AbsolutePath): AbsolutePath =>
   absolutePath(`${sentinel.slice(0, sentinel.lastIndexOf("/"))}/.runner-lock`);
+export const protonPassphraseFile = absolutePath("/secrets/proton-gpg-passphrase");
 export const RemoteFolder = Schema.String.check(
   Schema.isPattern(/^\/my-files\/(?!.*(?:^|\/)\.\.?($|\/))[^/\\\0]+(?:\/[^/\\\0]+)*$/u),
 ).pipe(Schema.brand("RemoteFolder"));
@@ -147,7 +148,9 @@ export const Job = Schema.Struct({
           : job.source.type === "postgres"
             ? job.source.passwordFile
             : job.source.tokenFile,
-        ...Array.flatMap(job.destinations, (d) => (d.type === "restic" ? [d.passwordFile] : [])),
+        ...Array.map(job.destinations, (d) =>
+          d.type === "restic" ? d.passwordFile : protonPassphraseFile,
+        ),
       ];
       const outputs = Array.map(job.destinations, (d) =>
         d.type === "restic" ? d.repository : d.outbox,

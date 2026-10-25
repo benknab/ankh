@@ -1,13 +1,17 @@
 import { Array, Effect, Option, Redacted, Schema } from "effect";
 import { BackupError, backupError } from "#domain/model.ts";
 import { runProton } from "#clients/proton/command.ts";
-import { ProtonState } from "#clients/proton/state.ts";
+import {
+  type KeyProtection,
+  keyProtection,
+  passphraseArguments,
+  ProtonState,
+} from "#clients/proton/state.ts";
 import { Storage } from "#storage/storage.ts";
 
 // Keep the stored key identity stable across the Ankh rename.
 const identity = "backup-runner@localhost";
 const probe = "ankh-probe";
-const noPassphrase = ["--pinentry-mode", "loopback", "--passphrase", ""] as const;
 
 const SecretKey = Schema.Struct({
   fingerprint: Schema.String.check(Schema.isPattern(/^[A-F0-9]{40,64}$/u)),
@@ -84,7 +88,67 @@ const requireKey = Effect.fn("Proton.requireKey")(function* () {
   });
 });
 
-const checkKey = Effect.fn("Proton.checkKey")(function* (key: SecretKey) {
+export const parseProtection = Effect.fn("Proton.parseProtection")(function* (
+  key: SecretKey,
+  output: string,
+) {
+  // Agent rows are `S KEYINFO <keygrip> <type> <serial> <id> <cached> <protection> ...`.
+  const states = Array.flatMap(output.split("\n"), (line) => {
+    const tokens = line.trim().split(/\s+/u);
+    return tokens[0] === "S" &&
+      tokens[1] === "KEYINFO" &&
+      Array.some(key.keygrips, (grip) => grip === tokens[2])
+      ? [field(tokens, 7)]
+      : [];
+  });
+  if (states.length !== key.keygrips.length) {
+    return yield* BackupError.make({ message: "GPG agent did not report every Proton key part" });
+  }
+  return Array.every(states, (state) => state === "P")
+    ? ("protected" as const)
+    : Array.every(states, (state) => state === "C")
+      ? ("unprotected" as const)
+      : ("mixed" as const);
+});
+
+const readProtection = Effect.fn("Proton.readProtection")(function* (key: SecretKey) {
+  const result = yield* runProton("gpg-connect-agent", [
+    ...Array.map(key.keygrips, (grip) => `KEYINFO ${grip}`),
+    "/bye",
+  ]);
+  return yield* parseProtection(key, Redacted.value(result.stdout));
+});
+
+type Protection = Effect.Success<ReturnType<typeof parseProtection>>;
+
+const mismatch = (
+  protection: KeyProtection,
+  state: Protection,
+  passphraseFile: string,
+): Option.Option<BackupError> =>
+  protection._tag === "None" && state !== "unprotected"
+    ? Option.some(
+        BackupError.make({
+          message: `The Proton GPG key is passphrase-protected; provide ${passphraseFile}`,
+        }),
+      )
+    : protection._tag === "Passphrase" && state !== "protected"
+      ? Option.some(
+          BackupError.make({
+            message: `The Proton GPG key is not protected by ${passphraseFile}; run proton-login`,
+          }),
+        )
+      : Option.none();
+
+const checkKey = Effect.fn("Proton.checkKey")(function* (
+  key: SecretKey,
+  protection: KeyProtection,
+) {
+  const { passphraseFile } = yield* ProtonState;
+  const error = mismatch(protection, yield* readProtection(key), passphraseFile);
+  if (Option.isSome(error)) {
+    return yield* error.value;
+  }
   if (!key.encrypts) {
     return yield* BackupError.make({
       message: "The Proton GPG key cannot encrypt; run proton-login to repair it",
@@ -92,10 +156,10 @@ const checkKey = Effect.fn("Proton.checkKey")(function* (key: SecretKey) {
   }
 });
 
-const createKey = Effect.fn("Proton.createKey")(function* () {
+const createKey = Effect.fn("Proton.createKey")(function* (protection: KeyProtection) {
   yield* runProton("gpg", [
     "--batch",
-    ...noPassphrase,
+    ...passphraseArguments(protection),
     "--quick-generate-key",
     `Ankh <${identity}>`,
     "default",
@@ -106,12 +170,37 @@ const createKey = Effect.fn("Proton.createKey")(function* () {
   return yield* requireKey();
 });
 
-const repairKey = Effect.fn("Proton.repairKey")(function* (key: SecretKey) {
+const protectKey = Effect.fn("Proton.protectKey")(function* (
+  key: SecretKey,
+  protection: KeyProtection,
+) {
+  const { passphraseFile } = yield* ProtonState;
+  const error = mismatch(protection, yield* readProtection(key), passphraseFile);
+  if (Option.isNone(error)) {
+    return;
+  }
+  // Never remove a passphrase implicitly; a missing passphrase file must fail closed.
+  if (protection._tag === "None") {
+    return yield* error.value;
+  }
+  yield* runProton("gpg", [
+    "--batch",
+    ...passphraseArguments(protection),
+    "--passwd",
+    key.fingerprint,
+  ]);
+  yield* Effect.logDebug({ event: "proton.key.protected" });
+});
+
+const repairKey = Effect.fn("Proton.repairKey")(function* (
+  key: SecretKey,
+  protection: KeyProtection,
+) {
   // Sign-only keys from the original prototype need an encryption subkey for pass.
   if (!key.encrypts) {
     yield* runProton("gpg", [
       "--batch",
-      ...noPassphrase,
+      ...passphraseArguments(protection),
       "--quick-add-key",
       key.fingerprint,
       "cv25519",
@@ -122,12 +211,13 @@ const repairKey = Effect.fn("Proton.repairKey")(function* (key: SecretKey) {
   }
 });
 
-const ensureKey = Effect.fn("Proton.ensureKey")(function* () {
+const ensureKey = Effect.fn("Proton.ensureKey")(function* (protection: KeyProtection) {
   const existing = yield* findKey();
-  const key = Option.isSome(existing) ? existing.value : yield* createKey();
-  yield* repairKey(key);
+  const key = Option.isSome(existing) ? existing.value : yield* createKey(protection);
+  yield* protectKey(key, protection);
+  yield* repairKey(key, protection);
   const final = yield* requireKey();
-  yield* checkKey(final);
+  yield* checkKey(final, protection);
   return final.fingerprint;
 });
 
@@ -179,14 +269,14 @@ const probeStore = Effect.fn("Proton.probeStore")(function* () {
 });
 
 export const setupCredentials = Effect.fn("Proton.setupCredentials")(function* () {
-  const fingerprint = yield* ensureKey();
+  const fingerprint = yield* ensureKey(yield* keyProtection());
   yield* ensureStore(fingerprint);
   yield* probeStore();
 });
 
 export const verifyCredentials = Effect.fn("Proton.verifyCredentials")(function* () {
   const key = yield* requireKey();
-  yield* checkKey(key);
+  yield* checkKey(key, yield* keyProtection());
   const current = yield* recipients();
   if (Option.isNone(current)) {
     return yield* BackupError.make({
