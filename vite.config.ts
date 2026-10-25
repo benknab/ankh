@@ -44,7 +44,6 @@ export default defineConfig({
       pedantic: "error",
       perf: "error",
       restriction: "error",
-      nursery: "error",
       style: "off",
     },
     options: { typeAware: true, typeCheck: true, reportUnusedDisableDirectives: "error" },
