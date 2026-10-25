@@ -26,6 +26,34 @@ export default defineConfig({
       ),
       ...recommended.rules,
       "effecttsgo/unstable-api-usage": "off",
+      "effecttsgo/global-date": "error",
+      "effecttsgo/global-date-in-effect": "error",
+      "effecttsgo/global-timers": "error",
+      "effecttsgo/global-timers-in-effect": "error",
+      "no-restricted-globals": [
+        "error",
+        { name: "Date", message: "Use Clock-backed DateTime effects and DateTime parsing." },
+        { name: "performance", message: "Use Effect Clock for elapsed time." },
+      ],
+      "no-restricted-properties": [
+        "error",
+        { object: "process", property: "hrtime", message: "Use Effect Clock for elapsed time." },
+        {
+          object: "DateTime",
+          property: "nowUnsafe",
+          message: "Use DateTime.now so time comes from Effect Clock.",
+        },
+        {
+          object: "DateTime",
+          property: "isFutureUnsafe",
+          message: "Use DateTime.isFuture so time comes from Effect Clock.",
+        },
+        {
+          object: "DateTime",
+          property: "isPastUnsafe",
+          message: "Use DateTime.isPast so time comes from Effect Clock.",
+        },
+      ],
     },
   },
 });

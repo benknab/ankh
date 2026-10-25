@@ -27,8 +27,11 @@ Do not use v3 examples or a separate copy of Effect documentation.
 - Use FileSystem, Path, HttpClient, ChildProcessSpawner, and Effect CLI with
   the native Effect Node platform. Node runs the TypeScript entry point directly;
   keep type-only imports explicit and use only erasable TypeScript syntax.
-- Use DateTime for clocks and calendar logic, Queue and Stream for upload work,
-  and Scope for subprocesses, locks, and temporary directories.
+- Read time through Effect Clock or the Clock-backed `DateTime.now` effect. Use
+  DateTime for parsing and calendar logic, and Effect sleep/schedules for delays.
+  Never use native Date, timers, performance clocks, or unsafe current-time helpers.
+- Use Queue and Stream for upload work, and Scope for subprocesses, locks, and
+  temporary directories.
 - The disk outbox is durable. An in-memory Queue must never replace persisted
   archives. Publish complete archive pairs by atomic directory rename. A failed
   upload must leave its pair available for retry.
