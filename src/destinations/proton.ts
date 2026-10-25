@@ -24,17 +24,26 @@ const check = Effect.fn("Proton.check")(function* (job: Job, destination: Proton
   }
 });
 
+const prepare = Effect.fn("Proton.prepare")(function* (
+  job: Job,
+  destination: Proton,
+  request: DestinationRequest,
+) {
+  // Persist the archive before any credential or network check can fail.
+  if (request.action === "backup") {
+    yield* (yield* Outbox).enqueue(job, destination, request.stage);
+  }
+  yield* track("credentials", (yield* ProtonDrive).verify);
+});
+
 export const protonAdapter: DestinationAdapter<Proton, Outbox | ProtonDrive | Storage> = {
   run: Effect.fn("Proton.run")(
     function* (job: Job, destination: Proton, request: DestinationRequest) {
       const outbox = yield* Outbox;
       const proton = yield* ProtonDrive;
+      yield* prepare(job, destination, request);
       if (request.action === "check" || request.action === "check-read-data") {
         return yield* check(job, destination);
-      }
-      // Persist the archive before any network request.
-      if (request.action === "backup") {
-        yield* outbox.enqueue(job, destination, request.stage);
       }
       yield* proton.initialize(destination);
       if (request.action !== "init") {

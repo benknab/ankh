@@ -1,9 +1,22 @@
 import { expect, it } from "@effect/vitest";
-import { Array, DateTime, Effect, HashSet, Layer, Redacted, Ref, Result, Schema } from "effect";
+import {
+  Array,
+  DateTime,
+  Effect,
+  FileSystem,
+  HashSet,
+  Layer,
+  Path,
+  Redacted,
+  Ref,
+  Result,
+  Schema,
+} from "effect";
 import { type Argument, Commands, type Options } from "#process/commands.ts";
 import { absolutePath, BackupError, JobName, Proton } from "#domain/model.ts";
 import { ProtonDrive } from "#clients/proton/client.ts";
 import { archiveName } from "#domain/archive.ts";
+import { Storage } from "#storage/storage.ts";
 import { output } from "#testing/commands.ts";
 
 const destinationConfig = Schema.decodeEffect(Proton)({
@@ -19,6 +32,18 @@ const listing = Effect.fn("Test.listing")((names: Iterable<string>) =>
     Array.map(Array.fromIterable(names), (value) => ({ name: { ok: true, value }, type: "file" })),
   ).pipe(Effect.orDie),
 );
+const protonLayer = (
+  commands: Commands["Service"],
+  files: Partial<FileSystem.FileSystem> = {},
+): Layer.Layer<ProtonDrive> =>
+  ProtonDrive.layer.pipe(
+    Layer.provide(
+      Layer.merge(
+        Layer.succeed(Commands, commands),
+        Storage.layer.pipe(Layer.provide(Layer.merge(Path.layer, FileSystem.layerNoop(files)))),
+      ),
+    ),
+  );
 const failedExit = (exitCode: number, stderr: string): BackupError =>
   BackupError.make({
     message: `flock exited ${exitCode}`,
@@ -37,9 +62,7 @@ it.effect("folder initialization only creates names missing from a successful li
     });
     yield* Effect.gen(function* () {
       yield* (yield* ProtonDrive).initialize(destination);
-    }).pipe(
-      Effect.provide(ProtonDrive.layer.pipe(Layer.provide(Layer.succeed(Commands, commands)))),
-    );
+    }).pipe(Effect.provide(protonLayer(commands)));
     expect(yield* Ref.get(calls), "missing folder must be created").toHaveLength(2);
     const failure = BackupError.make({ message: "authentication failed" });
     const broken = Commands.of({
@@ -50,10 +73,7 @@ it.effect("folder initialization only creates names missing from a successful li
     });
     const result = yield* Effect.gen(function* () {
       yield* (yield* ProtonDrive).initialize(destination);
-    }).pipe(
-      Effect.provide(ProtonDrive.layer.pipe(Layer.provide(Layer.succeed(Commands, broken)))),
-      Effect.result,
-    );
+    }).pipe(Effect.provide(protonLayer(broken)), Effect.result);
     expect(
       Result.isFailure(result) && result.failure === failure,
       "authentication error must be preserved",
@@ -76,9 +96,7 @@ it.effect("Proton commands run under the state lock with a pinned environment", 
     });
     yield* Effect.gen(function* () {
       yield* (yield* ProtonDrive).list(destination);
-    }).pipe(
-      Effect.provide(ProtonDrive.layer.pipe(Layer.provide(Layer.succeed(Commands, commands)))),
-    );
+    }).pipe(Effect.provide(protonLayer(commands)));
     const [call] = yield* Ref.get(calls);
     expect(call?.binary, "every Proton tool must run through flock").toBe("flock");
     expect(call?.args.slice(0, 9)).toEqual([
@@ -116,10 +134,7 @@ it.effect("Proton CLI failures are described without exposing tool output", () =
       const commands = Commands.of({ run: () => Effect.fail(failure) });
       const result = yield* Effect.gen(function* () {
         return yield* (yield* ProtonDrive).list(destination);
-      }).pipe(
-        Effect.provide(ProtonDrive.layer.pipe(Layer.provide(Layer.succeed(Commands, commands)))),
-        Effect.flip,
-      );
+      }).pipe(Effect.provide(protonLayer(commands)), Effect.flip);
       expect(result.message).toContain(expected);
       expect(result.message).not.toContain("secrets");
       expect(result.exitCode).toBe(exitCode);
@@ -140,10 +155,7 @@ it.effect("Proton rejects malformed listings and unconfirmed uploads", () =>
         checksum: absolutePath(`${directory}/${name}.sha256`),
         directory,
       });
-    }).pipe(
-      Effect.provide(ProtonDrive.layer.pipe(Layer.provide(Layer.succeed(Commands, commands)))),
-      Effect.result,
-    );
+    }).pipe(Effect.provide(protonLayer(commands)), Effect.result);
     expect(Result.isFailure(result), "missing remote pair must fail upload confirmation").toBe(
       true,
     );
@@ -151,13 +163,7 @@ it.effect("Proton rejects malformed listings and unconfirmed uploads", () =>
       const invalidResult = yield* Effect.gen(function* () {
         return yield* (yield* ProtonDrive).list(destination);
       }).pipe(
-        Effect.provide(
-          ProtonDrive.layer.pipe(
-            Layer.provide(
-              Layer.succeed(Commands, Commands.of({ run: () => Effect.succeed(output(invalid)) })),
-            ),
-          ),
-        ),
+        Effect.provide(protonLayer(Commands.of({ run: () => Effect.succeed(output(invalid)) }))),
         Effect.result,
       );
       expect(Result.isFailure(invalidResult), "invalid listing must fail closed").toBe(true);
@@ -185,9 +191,7 @@ it.effect("Proton trash can resume a known partial deletion", () =>
     });
     yield* Effect.gen(function* () {
       yield* (yield* ProtonDrive).trash(destination, HashSet.make(name));
-    }).pipe(
-      Effect.provide(ProtonDrive.layer.pipe(Layer.provide(Layer.succeed(Commands, commands)))),
-    );
+    }).pipe(Effect.provide(protonLayer(commands)));
     expect(HashSet.size(yield* Ref.get(remaining)), "remaining checksum must be removed").toBe(0);
   }),
 );

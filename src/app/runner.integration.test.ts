@@ -60,6 +60,7 @@ it.live("real SQLite and Restic survive Proton failure, then retry and restore b
     const proton = Layer.succeed(
       ProtonDrive,
       ProtonDrive.of({
+        verify: Effect.void,
         initialize: () => Effect.void,
         list: () =>
           fs.readDirectory(remote).pipe(

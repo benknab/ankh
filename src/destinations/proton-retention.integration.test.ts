@@ -26,6 +26,7 @@ it.live("retention retries only journaled partial deletions and rejects unrelate
     const names = yield* Ref.make(HashSet.make(old, `${old}.sha256`, latest, `${latest}.sha256`));
     const fail = yield* Ref.make(true);
     const proton = ProtonDrive.of({
+      verify: Effect.void,
       initialize: () => Effect.void,
       upload: () => Effect.void,
       list: () => Ref.get(names),

@@ -53,6 +53,7 @@ const trashPair = Effect.fn("ProtonDrive.trashPair")(function* (
 export class ProtonDrive extends Context.Service<
   ProtonDrive,
   {
+    readonly verify: Effect.Effect<void, BackupError>;
     readonly initialize: (destination: Folder) => Effect.Effect<void, BackupError>;
     readonly list: (destination: Folder) => Effect.Effect<HashSet.HashSet<string>, BackupError>;
     readonly upload: (destination: Folder, archive: Archive) => Effect.Effect<void, BackupError>;
@@ -67,6 +68,7 @@ export class ProtonDrive extends Context.Service<
     Effect.gen(function* () {
       const cli = yield* ProtonCli;
       return ProtonDrive.of({
+        verify: cli.verify,
         initialize: (destination) => initialize(cli, destination),
         list: (destination) => cli.list(destination.remoteFolder, "file"),
         upload: (destination, archive) => upload(cli, destination, archive),

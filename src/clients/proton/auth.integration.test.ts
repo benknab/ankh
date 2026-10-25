@@ -2,6 +2,7 @@ import { expect, it } from "@effect/vitest";
 import { Duration, Effect, Fiber, Redacted, Ref, Result } from "effect";
 import { login } from "#clients/proton/auth.ts";
 import { runProton } from "#clients/proton/command.ts";
+import { verifyCredentials } from "#clients/proton/credentials.ts";
 import { type ProtonPaths, ProtonState, protonEnvironment } from "#clients/proton/state.ts";
 import { absolutePath, type BackupError } from "#domain/model.ts";
 import { Commands, type Options } from "#process/commands.ts";
@@ -57,11 +58,16 @@ it.live("Proton credential setup creates a usable private store", () =>
     const commands = yield* Commands;
     const { logins, run } = yield* stubbedLogin();
     yield* run;
+    yield* verifyCredentials();
     const [options] = yield* Ref.get(logins);
     expect(options?.interactive, "the browser login must use the terminal").toBe(true);
     for (const directory of [paths.gnupg, paths.passwordStore, paths.cache]) {
       expect(((yield* fs.stat(directory)).mode & 0o777).toString(8)).toBe("700");
     }
+    expect(
+      yield* fs.exists(`${paths.passwordStore}/ankh-probe.gpg`),
+      "the store probe must be removed",
+    ).toBe(false);
     const env = protonEnvironment(paths);
     const probe = `${paths.cache}/probe`;
     yield* fs.writeFileString(probe, "credential-round-trip", { mode: 0o600 });
@@ -81,6 +87,43 @@ it.live("Proton credential setup creates a usable private store", () =>
       "a second login must reuse the key and store",
     ).toBe(recipients);
     expect(yield* Ref.get(logins)).toHaveLength(2);
+  }).pipe(Effect.provideServiceEffect(ProtonState, isolated()), Effect.provide(infrastructure)),
+);
+
+it.live("a password store for another key fails before the browser login", () =>
+  Effect.gen(function* () {
+    const paths = yield* ProtonState;
+    const { fs } = yield* Storage;
+    const { logins, run } = yield* stubbedLogin();
+    yield* run;
+    yield* fs.writeFileString(`${paths.passwordStore}/.gpg-id`, `${"0".repeat(40)}\n`);
+    const result = yield* run.pipe(Effect.result);
+    expect(messageOf(result)).toContain("different key");
+    expect(messageOf(yield* verifyCredentials().pipe(Effect.result))).toContain("different key");
+    expect(yield* Ref.get(logins), "mismatched stores must not start a login").toHaveLength(1);
+  }).pipe(Effect.provideServiceEffect(ProtonState, isolated()), Effect.provide(infrastructure)),
+);
+
+it.live("a sign-only legacy key is repaired with an encryption subkey", () =>
+  Effect.gen(function* () {
+    const paths = yield* ProtonState;
+    const { fs } = yield* Storage;
+    const { run } = yield* stubbedLogin();
+    yield* fs.makeDirectory(paths.gnupg, { mode: 0o700 });
+    yield* runProton("gpg", [
+      "--batch",
+      "--pinentry-mode",
+      "loopback",
+      "--passphrase",
+      "",
+      "--quick-generate-key",
+      "Backup Runner <backup-runner@localhost>",
+      "ed25519",
+      "sign",
+      "0",
+    ]);
+    yield* run;
+    yield* verifyCredentials();
   }).pipe(Effect.provideServiceEffect(ProtonState, isolated()), Effect.provide(infrastructure)),
 );
 

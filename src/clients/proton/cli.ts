@@ -2,6 +2,8 @@ import { Array, Context, Effect, HashSet, Layer, Redacted, Schema } from "effect
 import { backupError, type BackupError } from "#domain/model.ts";
 import { Commands } from "#process/commands.ts";
 import { runProton } from "#clients/proton/command.ts";
+import { verifyCredentials } from "#clients/proton/credentials.ts";
+import { Storage } from "#storage/storage.ts";
 
 const Name = Schema.Struct({ ok: Schema.Literal(true), value: Schema.NonEmptyString });
 const Files = Schema.fromJsonString(
@@ -14,6 +16,7 @@ const Folders = Schema.fromJsonString(
 export class ProtonCli extends Context.Service<
   ProtonCli,
   {
+    readonly verify: Effect.Effect<void, BackupError>;
     readonly list: (
       folder: string,
       type: "file" | "folder",
@@ -26,7 +29,9 @@ export class ProtonCli extends Context.Service<
   public static readonly layer = Layer.effect(
     ProtonCli,
     Effect.gen(function* () {
-      const context = (yield* Effect.context<Commands>()).pipe(Context.pick(Commands));
+      const context = (yield* Effect.context<Commands | Storage>()).pipe(
+        Context.pick(Commands, Storage),
+      );
       const run = Effect.fn("ProtonCli.run")((args: readonly string[]) =>
         runProton("proton-drive", ["filesystem", ...args]).pipe(Effect.provide(context)),
       );
@@ -41,6 +46,7 @@ export class ProtonCli extends Context.Service<
         Effect.mapError(backupError("Proton listing")),
       );
       return ProtonCli.of({
+        verify: verifyCredentials().pipe(Effect.provide(context)),
         list,
         createFolder: (parent, name) => run(["create-folder", parent, name]).pipe(Effect.asVoid),
         upload: (folder, files) =>

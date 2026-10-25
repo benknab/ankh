@@ -14,7 +14,8 @@ export type Step =
   | "cleanup"
   | "archive"
   | "upload"
-  | "retention";
+  | "retention"
+  | "credentials";
 export type Status = "success" | "failure" | "interrupted";
 
 export interface StepSummary {
