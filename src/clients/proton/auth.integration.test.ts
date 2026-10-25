@@ -54,12 +54,6 @@ const stubbedLogin = Effect.fn("Test.stubbedLogin")(function* () {
   };
 });
 
-const stopAgent = Effect.fn("Test.stopAgent")(function* (paths: ProtonPaths) {
-  yield* (yield* Commands).run("gpgconf", ["--kill", "gpg-agent"], {
-    env: { GNUPGHOME: paths.gnupg },
-  });
-});
-
 const messageOf = (result: Result.Result<unknown, BackupError>): string =>
   Result.isFailure(result) ? result.failure.message : "";
 
@@ -80,6 +74,9 @@ it.live("unprotected Proton credential setup creates a usable private store", ()
       yield* fs.exists(`${paths.passwordStore}/ankh-probe.gpg`),
       "the store probe must be removed",
     ).toBe(false);
+    expect(yield* fs.readFileString(`${paths.gnupg}/gpg-agent.conf`)).toBe(
+      "default-cache-ttl 0\nmax-cache-ttl 0\n",
+    );
     const env = protonEnvironment(paths, { _tag: "None" });
     const probe = `${paths.cache}/probe`;
     yield* fs.writeFileString(probe, "credential-round-trip", { mode: 0o600 });
@@ -110,7 +107,6 @@ it.live("a passphrase file protects new keys and must stay available", () =>
     yield* fs.writeFileString(paths.passphraseFile, "correct horse battery\n", { mode: 0o600 });
     yield* run;
     yield* verifyCredentials();
-    yield* stopAgent(paths);
     yield* fs.remove(paths.passphraseFile);
     const verified = yield* verifyCredentials().pipe(Effect.result);
     expect(messageOf(verified), "a missing passphrase file must fail closed").toContain(
@@ -144,7 +140,7 @@ it.live("adding a passphrase file protects an existing key on the next login", (
     yield* run;
     yield* verifyCredentials();
     yield* runProton("pass", ["show", "existing-entry"]);
-    yield* stopAgent(paths);
+    // The agent stays running, so this also proves it did not cache the passphrase.
     const unprotected = yield* commands
       .run("pass", ["show", "existing-entry"], {
         env: protonEnvironment(paths, { _tag: "None" }),

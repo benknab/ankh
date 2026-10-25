@@ -54,7 +54,30 @@ const probeStore = Effect.fn("Proton.probeStore")(function* () {
   yield* runProton("pass", ["rm", "--force", probe]);
 });
 
+// Ankh passes the passphrase file on every call. A cached passphrase would let anything that
+// reaches the agent socket in the shared volume decrypt the session without that file.
+const agentConfig = "default-cache-ttl 0\nmax-cache-ttl 0\n";
+
+const ensureAgentConfig = Effect.fn("Proton.ensureAgentConfig")(function* () {
+  const { fs, path } = yield* Storage;
+  const { gnupg } = yield* ProtonState;
+  const file = path.join(gnupg, "gpg-agent.conf");
+  const current = yield* fs.exists(file).pipe(
+    Effect.flatMap((exists) => (exists ? fs.readFileString(file) : Effect.succeed(""))),
+    Effect.mapError(backupError("Proton agent configuration")),
+  );
+  if (current === agentConfig) {
+    return;
+  }
+  yield* fs
+    .writeFileString(file, agentConfig, { mode: 0o600 })
+    .pipe(Effect.mapError(backupError("Proton agent configuration")));
+  // A running agent keeps its old settings until it reloads them.
+  yield* runProton("gpg-connect-agent", ["RELOADAGENT", "/bye"]);
+});
+
 export const setupCredentials = Effect.fn("Proton.setupCredentials")(function* () {
+  yield* ensureAgentConfig();
   const fingerprint = yield* ensureKey(yield* keyProtection());
   yield* ensureStore(fingerprint);
   yield* probeStore();
@@ -62,6 +85,7 @@ export const setupCredentials = Effect.fn("Proton.setupCredentials")(function* (
 
 export const verifyCredentials = Effect.fn("Proton.verifyCredentials")(function* () {
   const key = yield* requireKey();
+  yield* ensureAgentConfig();
   yield* checkKey(key, yield* keyProtection());
   const current = yield* recipients();
   if (Option.isNone(current)) {
