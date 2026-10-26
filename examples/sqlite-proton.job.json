@@ -16,7 +16,7 @@
     },
     {
       "type": "proton-drive",
-      "remoteFolder": "/my-files/Backups/example-host/example-job",
+      "remoteFolder": "/shared-with-me/Ankh Backups/example-host/example-job",
       "outbox": "/backups/outbox/example-host/example-job"
     }
   ],

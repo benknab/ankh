@@ -128,6 +128,50 @@ That job includes both destinations and needs the same configuration changes,
 plus a remote folder and a persistent outbox path. Authentication uses an external
 Docker volume shared by the login and backup containers.
 
+#### Dedicated free account and a shared folder
+
+Use a separate **Proton Free account** for Ankh, and share only the backup folder
+from your main account. No second paid subscription is needed: files uploaded to
+the shared folder count against the **owner's storage**, not the backup account's
+quota ([Proton's sharing documentation](https://proton.me/support/drive-how-to-share-files-via-email)).
+
+1. Create a separate Proton Free account with its own login, not an alias on your
+   main account. Keep personal mail and passwords out of it.
+2. In your main account's Drive, create `Ankh Backups` and invite the backup
+   account by email with **Can edit** access. In sharing settings, turn off
+   **Access** so editors cannot manage permissions or share the folder onward.
+3. Sign in as the backup account and accept the invitation. Confirm that
+   `Ankh Backups` appears under **Shared with me**. Use a unique shared-folder
+   name: the pinned CLI resolves shared roots by name.
+4. Set the Proton destination in your job file:
+
+   ```json
+   {
+     "type": "proton-drive",
+     "remoteFolder": "/shared-with-me/Ankh Backups/example-host/example-job",
+     "outbox": "/backups/outbox/example-host/example-job"
+   }
+   ```
+
+5. Run the login command below and complete its browser sign-in as the **backup
+   account**. Then run `init` and a manual `backup`.
+
+Ankh requires the invited root to exist and creates missing subfolders beneath it.
+You can also target `/shared-with-me/Ankh Backups` directly. Missing or revoked
+shares, unreadable names, and duplicate names in the shared-root listing fail
+closed; Ankh never substitutes a folder in the backup account's own Drive.
+Uploads that fail remain in the local outbox for `retry`.
+
+The backup account can read, modify, and trash files in the shared folder. This
+isolates your other files, Mail, and Pass, but is not upload-only access. Trashed
+files go to the owner's Trash. Verify a real backup and restore before enabling
+the scheduler; credential-free tests cannot verify your invitation or permissions.
+
+For storage owned by the backup account itself, `/my-files/Backups/host/job`
+remains supported and uses that account's storage quota.
+
+#### Login and first backup
+
 ```sh
 docker volume create backup-proton-state
 docker compose -f examples/compose.yaml -f examples/compose.proton.yaml run --rm proton-auth
@@ -138,6 +182,11 @@ docker compose -f examples/compose.yaml -f examples/compose.proton.yaml run --rm
 Login prints a sign-in URL and waits up to 10 minutes for it to complete.
 Subsequent commands use the credentials stored in the volume. The volume name can
 be changed with `PROTON_STATE_VOLUME`.
+
+If you previously signed in with your main account, revoke that CLI session in
+the main account's security settings. Set `PROTON_STATE_VOLUME` to a new volume
+name and create that volume before signing in with the backup account; do not
+reuse the main account's credential volume.
 
 To require a passphrase for the stored credentials, write it as one line to
 `SECRETS_DIR/proton-gpg-passphrase` before logging in, or add it later and log in

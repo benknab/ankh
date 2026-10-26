@@ -90,7 +90,12 @@ it.effect("every job requires a cron expression and defaults an omitted time zon
 
 it.effect("Proton folders validate every segment including one-character names", () =>
   Effect.gen(function* () {
-    for (const folder of ["/my-files/a", "/my-files/Backups/host/job"]) {
+    for (const folder of [
+      "/my-files/a",
+      "/my-files/Backups/host/job",
+      "/shared-with-me/a",
+      "/shared-with-me/Ankh Backups/host/job",
+    ]) {
       yield* Schema.decodeEffect(RemoteFolder)(folder);
     }
     for (const folder of [
@@ -103,10 +108,27 @@ it.effect("Proton folders validate every segment including one-character names",
       "/my-files/a/--help",
       "/my-files/a~b",
       "/my-files/a\n",
+      "/my-files",
+      "/my-files/..",
+      "/my-files/./a",
+      "/shared-with-me",
+      "/shared-with-me/",
+      "/shared-with-me/a/",
+      "/shared-with-me/a//b",
+      "/shared-with-me/..",
+      "/shared-with-me/a/../b",
+      "/shared-with-me/a/./b",
+      "/shared-with-me/-a",
+      "/shared-with-me/a/--help",
+      "/shared-with-me/a~b",
+      "/shared-with-me/a\\b",
+      "/shared-with-me/a\n",
+      "/shared-with-me/a\0",
+      "/shared-by-me/a",
     ]) {
       expect(
         Result.isFailure(yield* Schema.decodeEffect(RemoteFolder)(folder).pipe(Effect.result)),
-        "unsafe folder must fail",
+        `unsafe folder must fail: ${folder}`,
       ).toBe(true);
     }
   }),

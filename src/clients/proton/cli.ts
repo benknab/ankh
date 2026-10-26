@@ -12,6 +12,10 @@ const Files = Schema.fromJsonString(
 const Folders = Schema.fromJsonString(
   Schema.Array(Schema.Struct({ name: Name, type: Schema.Literal("folder") })),
 );
+// CLI 0.8.0 ignores --type for shared-with-me listings, including descendants.
+const SharedNodes = Schema.fromJsonString(
+  Schema.Array(Schema.Struct({ name: Name, type: Schema.Literals(["file", "folder"]) })),
+);
 
 export class ProtonCli extends Context.Service<
   ProtonCli,
@@ -38,16 +42,21 @@ export class ProtonCli extends Context.Service<
       const list = Effect.fn("ProtonCli.list")(
         function* (folder: string, type: "file" | "folder") {
           const result = yield* run(["list", "--json", "--type", type, folder]);
-          const nodes = yield* Schema.decodeEffect(type === "file" ? Files : Folders)(
-            Redacted.value(result.stdout),
-          );
+          const shared = folder === "/shared-with-me" || folder.startsWith("/shared-with-me/");
+          const schema = shared ? SharedNodes : type === "file" ? Files : Folders;
+          const nodes = yield* Schema.decodeEffect(schema)(Redacted.value(result.stdout));
           const names = HashSet.fromIterable(Array.map(nodes, (node) => node.name.value));
           if (HashSet.size(names) !== nodes.length) {
             return yield* BackupError.make({
               message: "Proton listing contains duplicate names; resolve them before retrying",
             });
           }
-          return names;
+          return HashSet.fromIterable(
+            Array.map(
+              Array.filter(nodes, (node) => node.type === type),
+              (node) => node.name.value,
+            ),
+          );
         },
         Effect.mapError(backupError("Proton listing")),
       );
