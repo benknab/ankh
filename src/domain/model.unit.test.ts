@@ -95,6 +95,7 @@ it.effect("Proton folders validate every segment including one-character names",
       "/my-files/Backups/host/job",
       "/shared-with-me/a",
       "/shared-with-me/Ankh Backups/host/job",
+      "/shared-with-me/日本語/📦 backups",
     ]) {
       yield* Schema.decodeEffect(RemoteFolder)(folder);
     }
@@ -124,6 +125,12 @@ it.effect("Proton folders validate every segment including one-character names",
       "/shared-with-me/a\\b",
       "/shared-with-me/a\n",
       "/shared-with-me/a\0",
+      "/shared-with-me/a\u2028/../other",
+      "/shared-with-me/a\u2029/--help",
+      "/shared-with-me/a\u2028",
+      "/shared-with-me/\uD800",
+      "/my-files/a\u2028/../other",
+      "/my-files/a\u2029/--help",
       "/shared-by-me/a",
     ]) {
       expect(

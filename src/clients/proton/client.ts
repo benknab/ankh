@@ -5,17 +5,13 @@ import { ProtonCli } from "#/clients/proton/cli.ts";
 
 type Folder = Pick<Proton, "remoteFolder">;
 
-const rootFolder = (folder: RemoteFolder): string =>
-  folder.startsWith("/my-files/") ? "/my-files" : Array.join(folder.split("/").slice(0, 3), "/");
-
-// The CLI resolves shared roots by name. Check every operation, including checks and
-// retention retries that do not initialize folders, rather than caching access.
-const withFolder = Effect.fn("ProtonDrive.withFolder")(function* <A>(
+const rootFolder = Effect.fn("ProtonDrive.rootFolder")(function* (
   cli: ProtonCli["Service"],
-  destination: Folder,
-  operation: Effect.Effect<A, BackupError>,
+  folder: RemoteFolder,
 ) {
-  const root = rootFolder(destination.remoteFolder);
+  const root = folder.startsWith("/my-files/")
+    ? "/my-files"
+    : Array.join(folder.split("/").slice(0, 3), "/");
   if (root !== "/my-files") {
     const folders = yield* cli.list("/shared-with-me", "folder");
     if (!HashSet.has(folders, root.slice("/shared-with-me/".length))) {
@@ -25,22 +21,41 @@ const withFolder = Effect.fn("ProtonDrive.withFolder")(function* <A>(
       });
     }
   }
-  return yield* operation;
+  return root;
 });
 
-const initialize = Effect.fn("ProtonDrive.initialize")(function* (
+// The CLI takes the first matching name at every level, not just the shared root.
+const prepareFolder = Effect.fn("ProtonDrive.prepareFolder")(function* (
   cli: ProtonCli["Service"],
   destination: Folder,
+  createMissing: boolean,
 ) {
-  let parent = rootFolder(destination.remoteFolder);
+  let parent = yield* rootFolder(cli, destination.remoteFolder);
   const names = destination.remoteFolder.slice(parent.length + 1);
   for (const name of names === "" ? [] : names.split("/")) {
     const folders = yield* cli.list(parent, "folder");
     if (!HashSet.has(folders, name)) {
+      if (!createMissing) {
+        return yield* BackupError.make({
+          message: "Proton destination folder is unavailable; check remoteFolder and run init",
+        });
+      }
       yield* cli.createFolder(parent, name);
     }
     parent = `${parent}/${name}`;
   }
+});
+
+// Recheck ancestors for checks and retention retries too; do not cache access.
+const withFolder = Effect.fn("ProtonDrive.withFolder")(function* <A>(
+  cli: ProtonCli["Service"],
+  destination: Folder,
+  operation: Effect.Effect<A, BackupError>,
+) {
+  if (destination.remoteFolder.startsWith("/shared-with-me/")) {
+    yield* prepareFolder(cli, destination, false);
+  }
+  return yield* operation;
 });
 
 const upload = Effect.fn("ProtonDrive.upload")(function* (
@@ -111,7 +126,7 @@ export class ProtonDrive extends Context.Service<
       const cli = yield* ProtonCli;
       return ProtonDrive.of({
         verify: cli.verify,
-        initialize: (destination) => withFolder(cli, destination, initialize(cli, destination)),
+        initialize: (destination) => prepareFolder(cli, destination, true),
         list: (destination) =>
           withFolder(cli, destination, cli.list(destination.remoteFolder, "file")),
         upload: (destination, archive) =>

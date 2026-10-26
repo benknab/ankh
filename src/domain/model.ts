@@ -33,9 +33,14 @@ export const absolutePath = Brand.nominal<AbsolutePath>();
 export const driveLockPath = (sentinel: AbsolutePath): AbsolutePath =>
   absolutePath(`${sentinel.slice(0, sentinel.lastIndexOf("/"))}/.runner-lock`);
 export const protonPassphraseFile = absolutePath("/secrets/proton-gpg-passphrase");
+const RemoteFolderName = Schema.String.check(
+  Schema.isPattern(/^(?!\.{1,2}$|-)[^/\\~\p{Cc}\p{Cs}\p{Zl}\p{Zp}]+$/u),
+);
 export const RemoteFolder = Schema.String.check(
-  Schema.isPattern(
-    /^(?!.*\/\.\.?($|\/))\/(?:my-files|shared-with-me)\/(?!-)(?!.*\/-)[^/\\~\p{Cc}]+(?:\/[^/\\~\p{Cc}]+)*$/u,
+  Schema.isPattern(/^\/(?:my-files|shared-with-me)\//u),
+  Schema.makeFilter(
+    (folder) => Array.every(folder.split("/").slice(2), Schema.is(RemoteFolderName)),
+    { message: "Remote folder must contain safe, non-empty path segments" },
   ),
 ).pipe(Schema.brand("RemoteFolder"));
 export type RemoteFolder = typeof RemoteFolder.Type;

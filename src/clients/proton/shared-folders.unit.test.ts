@@ -134,6 +134,66 @@ it.effect("revoking a share after initialization prevents subsequent access", ()
   }),
 );
 
+it.effect("every shared operation rejects missing or ambiguous descendant folders", () =>
+  Effect.gen(function* () {
+    const config = yield* destination("/shared-with-me/Ankh Backups/host/job");
+    const job = yield* Schema.decodeEffect(JobName)("test-job");
+    const name = archiveName(job, DateTime.makeUnsafe("2026-01-01T00:00:00Z"));
+    const archive = {
+      name,
+      directory: absolutePath("/outbox/pair"),
+      file: absolutePath(`/outbox/pair/${name}`),
+      checksum: absolutePath(`/outbox/pair/${name}.sha256`),
+    };
+    const shared = yield* listing([node("Ankh Backups")]);
+    const host = yield* listing([node("host")]);
+    for (const [nodes, reason] of [
+      [[], "destination folder is unavailable"],
+      [[node("job", "file")], "destination folder is unavailable"],
+      [[node("job"), node("job")], "duplicate names"],
+      [[node("job"), node("job", "file")], "duplicate names"],
+      [[{ name: { ok: false }, type: "folder" }], "Proton listing"],
+    ] as const) {
+      const children = yield* listing(nodes);
+      const calls: (readonly Argument[])[] = [];
+      const commands = Commands.of({
+        run: (_binary, args) => {
+          const command = args.slice(9);
+          expect(command.slice(0, 4)).toEqual(["list", "--json", "--type", "folder"]);
+          const parent = command.at(-1);
+          expect([
+            "/shared-with-me",
+            "/shared-with-me/Ankh Backups",
+            "/shared-with-me/Ankh Backups/host",
+          ]).toContain(parent);
+          calls.push(command);
+          return Effect.succeed(
+            output(
+              parent === "/shared-with-me"
+                ? shared
+                : parent === "/shared-with-me/Ankh Backups"
+                  ? host
+                  : children,
+            ),
+          );
+        },
+      });
+      yield* Effect.gen(function* () {
+        const proton = yield* ProtonDrive;
+        for (const operation of [
+          proton.list(config),
+          proton.upload(config, archive),
+          proton.trash(config, HashSet.make(name)),
+        ]) {
+          const failure = yield* operation.pipe(Effect.flip);
+          expect(failure.message).toContain(reason);
+        }
+      }).pipe(Effect.provide(layer(commands)));
+      expect(calls).toHaveLength(9);
+    }
+  }),
+);
+
 it.effect("shared listing failures preserve the error and never create a replacement root", () =>
   Effect.gen(function* () {
     const config = yield* destination("/shared-with-me/Ankh Backups/job");
