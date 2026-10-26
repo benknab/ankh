@@ -14,7 +14,7 @@ import {
 import { FetchHttpClient } from "effect/http";
 import { Commands } from "#/process/commands.ts";
 import { Destinations } from "#/destinations/destinations.ts";
-import { absolutePath, BackupError, Job } from "#/domain/model.ts";
+import { absolutePath, BackupError, Job, protonFolderIdentity } from "#/domain/model.ts";
 import { Outbox } from "#/outbox/outbox.ts";
 import { ProtonDrive } from "#/clients/proton/client.ts";
 import { runJob } from "#/app/runner.ts";
@@ -57,16 +57,22 @@ it.live("real SQLite and Restic survive Proton failure, then retry and restore b
     const jobFile = absolutePath(path.join(root, "job.json"));
     yield* fs.writeFileString(jobFile, yield* Schema.encodeEffect(Schema.fromJsonString(Job))(job));
     const online = yield* Ref.make(false);
+    const remoteListing = fs.readDirectory(remote).pipe(
+      Effect.map(HashSet.fromIterable),
+      Effect.mapError((e) => BackupError.make({ message: String(e) })),
+    );
     const proton = Layer.succeed(
       ProtonDrive,
       ProtonDrive.of({
         verify: Effect.void,
         initialize: () => Effect.void,
-        list: () =>
-          fs.readDirectory(remote).pipe(
-            Effect.map(HashSet.fromIterable),
-            Effect.mapError((e) => BackupError.make({ message: String(e) })),
-          ),
+        list: () => remoteListing,
+        open: () =>
+          Effect.succeed({
+            identity: protonFolderIdentity("simulated-remote"),
+            list: remoteListing,
+            trash: () => Effect.void,
+          }),
         upload: (_destination, archive) =>
           Effect.gen(function* () {
             if (!(yield* Ref.get(online))) {

@@ -164,6 +164,11 @@ those IDs for its writes and confirmation rather than resolving folder names
 again. Ankh never substitutes a folder in the backup account's own Drive.
 Uploads that fail remain in the local outbox for `retry`.
 
+Retention keeps the same resolved folder throughout an attempt and records its
+identity in the deletion journal. A retry stops if that identity changed. Older
+shared-folder journals without an identity also stop: reconcile their pending
+deletions before removing the journal and retrying.
+
 The backup account can read, modify, and trash files in the shared folder. This
 isolates your other files, Mail, and Pass, but is not upload-only access. Trashed
 files go to the owner's Trash. Verify a real backup and restore before enabling

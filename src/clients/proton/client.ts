@@ -1,11 +1,28 @@
 import { Array, Context, Effect, HashSet, Layer } from "effect";
-import { type ArchiveName, BackupError, type Proton, type RemoteFolder } from "#/domain/model.ts";
+import {
+  type ArchiveName,
+  BackupError,
+  type Proton,
+  type ProtonFolderIdentity,
+  protonFolderIdentity,
+  type RemoteFolder,
+} from "#/domain/model.ts";
 import type { Archive } from "#/domain/archive.ts";
 import { ProtonCli } from "#/clients/proton/cli.ts";
-import { resolveSharedFolder, type SharedFolderPath } from "#/clients/proton/shared.ts";
+import {
+  resolveSharedFolder,
+  type SharedFolderPath,
+  trashSharedFiles,
+} from "#/clients/proton/shared.ts";
 
 type Folder = Pick<Proton, "remoteFolder">;
 type Target = RemoteFolder | SharedFolderPath;
+
+export interface OpenProtonFolder {
+  readonly identity: ProtonFolderIdentity;
+  readonly list: Effect.Effect<HashSet.HashSet<string>, BackupError>;
+  readonly trash: (names: HashSet.HashSet<ArchiveName>) => Effect.Effect<void, BackupError>;
+}
 
 const initialize = Effect.fn("ProtonDrive.initialize")(function* (
   cli: ProtonCli["Service"],
@@ -62,7 +79,7 @@ const trashBatch = Effect.fn("ProtonDrive.trashBatch")(function* (
   }
 });
 
-const trash = Effect.fn("ProtonDrive.trash")(function* (
+const trashOwn = Effect.fn("ProtonDrive.trashOwn")(function* (
   cli: ProtonCli["Service"],
   folder: Target,
   names: HashSet.HashSet<ArchiveName>,
@@ -87,11 +104,25 @@ const trash = Effect.fn("ProtonDrive.trash")(function* (
   }
 });
 
+const trash = Effect.fn("ProtonDrive.trash")(
+  (
+    cli: ProtonCli["Service"],
+    folder: Target,
+    names: HashSet.HashSet<ArchiveName>,
+  ): Effect.Effect<void, BackupError> =>
+    HashSet.size(names) === 0
+      ? Effect.void
+      : folder.startsWith("/shared-with-me/")
+        ? trashSharedFiles(cli, folder, names)
+        : trashOwn(cli, folder, names),
+);
+
 export class ProtonDrive extends Context.Service<
   ProtonDrive,
   {
     readonly verify: Effect.Effect<void, BackupError>;
     readonly initialize: (destination: Folder) => Effect.Effect<void, BackupError>;
+    readonly open: (destination: Folder) => Effect.Effect<OpenProtonFolder, BackupError>;
     readonly list: (destination: Folder) => Effect.Effect<HashSet.HashSet<string>, BackupError>;
     readonly upload: (destination: Folder, archive: Archive) => Effect.Effect<void, BackupError>;
     readonly trash: (
@@ -107,6 +138,14 @@ export class ProtonDrive extends Context.Service<
       return ProtonDrive.of({
         verify: cli.verify,
         initialize: (destination) => initialize(cli, destination),
+        open: (destination) =>
+          withFolder(cli, destination, (folder) =>
+            Effect.succeed({
+              identity: protonFolderIdentity(folder),
+              list: cli.list(folder, "file"),
+              trash: (names) => trash(cli, folder, names),
+            }),
+          ),
         list: (destination) => withFolder(cli, destination, (folder) => cli.list(folder, "file")),
         upload: (destination, archive) =>
           withFolder(cli, destination, (folder) => upload(cli, folder, archive)),

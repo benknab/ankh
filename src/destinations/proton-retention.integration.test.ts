@@ -66,6 +66,14 @@ it.live("retention retries only journaled partial deletions and rejects unrelate
       yield* fs.exists(path.join(destination.outbox, `.retention-${job.name}.json`)),
       "failure must retain deletion intent",
     ).toBe(true);
+    // Existing own-Drive journals predate identity binding and remain recoverable.
+    yield* fs.writeFileString(
+      path.join(destination.outbox, `.retention-${job.name}.json`),
+      yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({
+        remoteFolder: destination.remoteFolder,
+        names: [old],
+      }),
+    );
     yield* run;
     expect(
       yield* fs.readDirectory(destination.outbox),

@@ -1,5 +1,5 @@
-import { Array, Brand, Effect, HashMap, Option } from "effect";
-import { BackupError, type RemoteFolder } from "#/domain/model.ts";
+import { Array, Brand, Effect, HashMap, HashSet, Option } from "effect";
+import { type ArchiveName, BackupError, type RemoteFolder } from "#/domain/model.ts";
 import type { ProtonCli } from "#/clients/proton/cli.ts";
 
 export type SharedFolderPath = string & Brand.Brand<"SharedFolderPath">;
@@ -45,4 +45,38 @@ export const resolveSharedFolder = Effect.fn("ProtonDrive.resolveSharedFolder")(
     parent = `${parent}/${child}`;
   }
   return sharedFolderPath(parent);
+});
+
+export const trashSharedFiles = Effect.fn("ProtonDrive.trashSharedFiles")(function* (
+  cli: ProtonCli["Service"],
+  folder: SharedFolderPath | RemoteFolder,
+  names: HashSet.HashSet<ArchiveName>,
+) {
+  const entries = yield* cli.sharedNodes(folder);
+  const files = Array.flatMap(Array.fromIterable(names), (name) => [name, `${name}.sha256`]);
+  const targets = HashSet.fromIterable(
+    Array.getSomes(
+      Array.map(files, (name) =>
+        HashMap.get(entries, name).pipe(
+          Option.filter((node) => node.type === "file"),
+          Option.map((node) => node.uid),
+        ),
+      ),
+    ),
+  );
+  // Bind individual files too: a concurrent rename must not trash an unrelated
+  // file or folder that takes the archive's old name after the listing.
+  for (const batch of Array.chunksOf(Array.fromIterable(targets), 100)) {
+    yield* cli.trash(Array.map(batch, (uid) => `${folder}/${uid}`));
+  }
+  const remaining = yield* cli.sharedNodes(folder);
+  if (
+    Array.some(Array.fromIterable(HashMap.values(remaining)), (node) =>
+      HashSet.has(targets, node.uid),
+    )
+  ) {
+    return yield* BackupError.make({
+      message: "Proton did not confirm trashing shared archive files",
+    });
+  }
 });

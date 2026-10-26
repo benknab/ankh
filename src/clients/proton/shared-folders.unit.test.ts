@@ -12,8 +12,12 @@ const destination = (remoteFolder: string): Effect.Effect<Proton, Schema.SchemaE
 const uid = (part: string): string => `${"v".repeat(22)}~${part.repeat(22)}`;
 const rootPath = `/shared-with-me/Ankh Backups/${uid("r")}`;
 const hostPath = `${rootPath}/${uid("h")}`;
-const node = (value: string, type: "folder" | "file" = "folder"): unknown => ({
-  uid: uid(value === "Ankh Backups" ? "r" : value === "host" ? "h" : "j"),
+const node = (
+  value: string,
+  type: "folder" | "file" = "folder",
+  identity = uid(value === "Ankh Backups" ? "r" : value === "host" ? "h" : "j"),
+): unknown => ({
+  uid: identity,
   name: { ok: true, value },
   type,
 });
@@ -94,6 +98,7 @@ it.effect("missing, ambiguous, and unreadable shares block every operation befor
       [[node("Ankh Backups", "file")], "accept its invitation"],
       [[node("Ankh Backups"), node("Ankh Backups")], "duplicate names"],
       [[node("Ankh Backups", "file"), node("Ankh Backups")], "duplicate names"],
+      [[node("Ankh Backups"), node("other", "folder", uid("r"))], "duplicate node identities"],
       [[{ name: { ok: false }, type: "folder" }], "Proton shared-folder listing"],
       [
         [{ name: { ok: true, value: "Ankh Backups" }, type: "folder", uid: "../../escape" }],
@@ -218,6 +223,56 @@ it.effect("shared listing failures preserve the error and never create a replace
     expect(calls).toHaveLength(1);
     expect(Array.some(calls, (args) => args.includes("create-folder"))).toBe(false);
   }),
+);
+
+it.effect.each([false, true])(
+  "shared trash preserves replacements and confirms original IDs (retained=%s)",
+  (retained) =>
+    Effect.gen(function* () {
+      const config = yield* destination("/shared-with-me/Ankh Backups");
+      const job = yield* Schema.decodeEffect(JobName)("test-job");
+      const name = archiveName(job, DateTime.makeUnsafe("2026-01-01T00:00:00Z"));
+      const shared = yield* listing([node("Ankh Backups")]);
+      const before = yield* listing([
+        node(name, "file", uid("a")),
+        node(`${name}.sha256`, "file", uid("c")),
+      ]);
+      const after = yield* listing([
+        node(name, "folder", uid("p")),
+        retained
+          ? node("renamed-checksum", "file", uid("c"))
+          : node(`${name}.sha256`, "file", uid("q")),
+      ]);
+      let trashed = false;
+      const commands = Commands.of({
+        run: (_binary, args) => {
+          if (args.at(-1) === "/shared-with-me") {
+            return Effect.succeed(output(shared));
+          }
+          if (args.includes("trash")) {
+            const files = args.slice(args.indexOf("--json") + 1);
+            expect(files).toHaveLength(2);
+            expect(files).toEqual(
+              expect.arrayContaining([`${rootPath}/${uid("a")}`, `${rootPath}/${uid("c")}`]),
+            );
+            trashed = true;
+            return Effect.succeed(output("[]"));
+          }
+          expect(args.at(-1)).toBe(rootPath);
+          return Effect.succeed(output(trashed ? after : before));
+        },
+      });
+      yield* Effect.gen(function* () {
+        const remove = (yield* ProtonDrive).trash(config, HashSet.make(name));
+        if (retained) {
+          const failure = yield* remove.pipe(Effect.flip);
+          expect(failure.message).toBe("Proton did not confirm trashing shared archive files");
+        } else {
+          yield* remove;
+        }
+      }).pipe(Effect.provide(layer(commands)));
+      expect(trashed).toBe(true);
+    }),
 );
 
 it.effect(

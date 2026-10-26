@@ -42,6 +42,11 @@ const sharedNodes = Effect.fn("ProtonCli.sharedNodes")(
         message: "Proton listing contains duplicate names; resolve them before retrying",
       });
     }
+    if (HashSet.size(HashSet.fromIterable(Array.map(nodes, (node) => node.uid))) !== nodes.length) {
+      return yield* BackupError.make({
+        message: "Proton listing contains duplicate node identities",
+      });
+    }
     return byName;
   },
   Effect.mapError(backupError("Proton shared-folder listing")),

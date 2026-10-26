@@ -32,6 +32,7 @@ it.effect("Proton credential failures keep the archive and report a fixed reason
       Layer.succeed(
         ProtonDrive,
         ProtonDrive.of({
+          open: () => Effect.die("must not reach Proton without credentials"),
           verify: record("verify").pipe(Effect.andThen(BackupError.make({ message: reason }))),
           initialize: () => Effect.die("must not reach Proton without credentials"),
           list: () => Effect.die("must not list without credentials"),

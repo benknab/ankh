@@ -44,6 +44,11 @@ export const RemoteFolder = Schema.String.check(
   ),
 ).pipe(Schema.brand("RemoteFolder"));
 export type RemoteFolder = typeof RemoteFolder.Type;
+export const ProtonFolderIdentity = Schema.NonEmptyString.pipe(
+  Schema.brand("ProtonFolderIdentity"),
+);
+export type ProtonFolderIdentity = typeof ProtonFolderIdentity.Type;
+export const protonFolderIdentity = Brand.nominal<ProtonFolderIdentity>();
 export const ArchiveName = Schema.String.check(
   Schema.isPattern(/^[a-z0-9][a-z0-9-]*-\d{8}T\d{9}Z\.tar\.zst$/u),
 ).pipe(Schema.brand("ArchiveName"));

@@ -41,6 +41,7 @@ it.live(
         retention: { daily: 1, weekly: 0, monthly: 0, yearly: 0 },
       });
       let denyUpload = true;
+      const old = archiveName(job.name, DateTime.makeUnsafe("2000-01-01T00:00:00Z"));
       let denied = 0;
       const sharedRoot = `/shared-with-me/Ankh Backups/${uid("r")}`;
       const target = `${sharedRoot}/${uid("j")}`;
@@ -82,7 +83,21 @@ it.live(
                   (value) =>
                     fs.stat(path.join(local(last), value)).pipe(
                       Effect.map((stat) => ({
-                        uid: uid(value === "test-job" ? "j" : value === "nested" ? "n" : "f"),
+                        uid: uid(
+                          value === "test-job"
+                            ? "j"
+                            : value === "nested"
+                              ? "n"
+                              : value === old
+                                ? "o"
+                                : value === `${old}.sha256`
+                                  ? "c"
+                                  : value.endsWith(".sha256")
+                                    ? "s"
+                                    : value.endsWith(".tar.zst")
+                                      ? "a"
+                                      : "f",
+                        ),
                         name: { ok: true, value },
                         type: stat.type === "Directory" ? "folder" : "file",
                       })),
@@ -115,8 +130,13 @@ it.live(
               case "trash": {
                 expect(args[1]).toBe("--json");
                 for (const file of args.slice(2)) {
-                  expect(file.startsWith(`${target}/test-job-2000`)).toBe(true);
-                  yield* fs.remove(local(file));
+                  expect([`${target}/${uid("o")}`, `${target}/${uid("c")}`]).toContain(file);
+                  yield* fs.remove(
+                    path.join(
+                      local(destination.remoteFolder),
+                      file === `${target}/${uid("o")}` ? old : `${old}.sha256`,
+                    ),
+                  );
                 }
                 return output("[]");
               }
@@ -172,7 +192,6 @@ it.live(
         ]);
         expect(Redacted.value(restored.stdout).trim()).toBe("verified");
 
-        const old = archiveName(job.name, DateTime.makeUnsafe("2000-01-01T00:00:00Z"));
         for (const file of [old, `${old}.sha256`, "unrelated.txt"]) {
           yield* fs.writeFileString(path.join(directory, file), "preserve unrelated data");
         }
