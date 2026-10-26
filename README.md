@@ -1,7 +1,10 @@
 # Ankh
 
-Ankh is an unpublished prototype for backing up personal
+Ankh is an unpublished, experimental prototype for backing up personal
 self-hosted applications to a hard drive and to remote storage on Proton Drive.
+The Proton integration works around the CLI's interactive authentication by
+storing a regular account's session for unattended use. Proper service accounts
+or SDK-managed authentication would be preferable; see [Security](#security).
 It has no published release and is neither tested nor optimized for large data
 sets. The source is available under the MIT license as a starting point for forks.
 
@@ -130,20 +133,11 @@ Docker volume shared by the login and backup containers.
 
 #### Dedicated free account and a shared folder
 
-Use a separate **Proton Free account** for Ankh, and share only the backup folder
-from your main account. No second paid subscription is needed: files uploaded to
-the shared folder count against the **owner's storage**, not the backup account's
-quota ([Proton's sharing documentation](https://proton.me/support/drive-how-to-share-files-via-email)).
-
-1. Create a separate Proton Free account with its own login, not an alias on your
-   main account. Keep personal mail and passwords out of it.
-2. In your main account's Drive, create `Ankh Backups` and invite the backup
-   account by email with **Can edit** access. In sharing settings, turn off
-   **Access** so editors cannot manage permissions or share the folder onward.
-3. Sign in as the backup account and accept the invitation. Confirm that
-   `Ankh Backups` appears under **Shared with me**. Use a unique shared-folder
-   name: the pinned CLI resolves shared roots by name.
-4. Set the Proton destination in your job file:
+1. Create a separate **Proton Free account**, not an alias of your main account.
+2. From your main account, share a uniquely named folder such as `Ankh Backups`
+   with **Can edit** permission and **Access** disabled. Accept the invitation
+   as the backup account.
+3. Set your job's Proton destination:
 
    ```json
    {
@@ -153,29 +147,9 @@ quota ([Proton's sharing documentation](https://proton.me/support/drive-how-to-s
    }
    ```
 
-5. Run the login command below and complete its browser sign-in as the **backup
-   account**. Then run `init` and a manual `backup`.
-
-Ankh requires the invited root to exist and creates missing subfolders beneath it.
-You can also target `/shared-with-me/Ankh Backups` directly. Missing or revoked
-shares, unreadable names, and duplicate names along the destination path fail
-closed. Each operation resolves shared folders to validated node IDs, then uses
-those IDs for its writes and confirmation rather than resolving folder names
-again. Ankh never substitutes a folder in the backup account's own Drive.
-Uploads that fail remain in the local outbox for `retry`.
-
-Retention keeps the same resolved folder throughout an attempt and records its
-identity in the deletion journal. A retry stops if that identity changed. Older
-shared-folder journals without an identity also stop: reconcile their pending
-deletions before removing the journal and retrying.
-
-The backup account can read, modify, and trash files in the shared folder. This
-isolates your other files, Mail, and Pass, but is not upload-only access. Trashed
-files go to the owner's Trash. Verify a real backup and restore before enabling
-the scheduler; credential-free tests cannot verify your invitation or permissions.
-
-For storage owned by the backup account itself, `/my-files/Backups/host/job`
-remains supported and uses that account's storage quota.
+Ankh creates the subfolders. Shared uploads use the **owner's storage**, so no
+second paid plan is needed. Follow the login steps below as the **backup account**,
+then verify a backup and restore before enabling the scheduler.
 
 #### Login and first backup
 
@@ -206,72 +180,32 @@ read that same passphrase from `SECRETS_DIR/proton-gpg-passphrase`.
 
 ## Security
 
-Proton publishes a Drive SDK, but not its sign-in and session handling, so Ankh
-runs the official Proton Drive CLI as an external tool rather than reimplementing
-Proton's authentication. The CLI is designed for interactive use. Running it
-unattended has these consequences.
+**Treat the Proton Drive integration as an experimental prototype.** The measures
+below are imperfect workarounds for running the current Proton Drive CLI
+unattended. Proper service accounts or an SDK that handles authentication would
+be preferable; for now, this setup relies on a regular account's stored session.
 
-**The Proton state volume is an account credential.** To run without a person
-present, the CLI stores the session tokens and the key password that unlocks the
-account's private keys. Anyone who can read the volume can act as the account and
-decrypt its data, not only Drive. Use a Proton account dedicated to backups.
-Write access is equivalent to running code in Ankh's containers, because GnuPG,
-`pass`, and the CLI read their configuration from the volume. Mount it only in
-Ankh containers.
+**Use a separate Proton Free account for the backup runner.** Share only your
+backup folder from your main account with **Can edit** permission and **Access**
+disabled. This isolates your other files, Mail, and Pass. The backup account can
+still read, modify, and delete shared backups, so keep an independent copy. See
+[the shared-folder setup](#dedicated-free-account-and-a-shared-folder).
 
-**The passphrase file separates that credential into two parts.** The session is
-stored in `pass`, encrypted with a GPG key kept in the same volume. Without
-`proton-gpg-passphrase`, the key has no passphrase, and a copy of the volume is
-enough to read the session. With it, decryption also needs the read-only secrets
-mount. This does not protect a running container or a host that can read both.
-The GPG agent, whose socket is in the volume, is configured not to cache the
-passphrase; its configuration is published atomically and reloaded on each run.
-`proton-login` adds the passphrase to an existing key and never
-removes one. Proton runs fail if the file is missing for a protected key, or if
-the file was added without logging in again. Changing the passphrase requires
-removing `/proton/gnupg` and `/proton/pass` and logging in again.
-Adding a passphrase cannot protect earlier copies of an unprotected key. If state
-may have leaked, revoke the sessions, change the Proton account password, and
-recreate the key and store before logging in again.
-
-Ankh works around the CLI's limits as follows:
-
-- **One CLI process at a time.** The CLI has no lock between processes and
-  rewrites the stored session after each token refresh; a failed refresh signs it
-  out. Every `proton-drive`, `gpg`, and `pass` call, including those made by
-  `proton-login`, holds an exclusive `flock` on `/proton/lock` across all
-  containers that share the volume. A call waits up to six hours for the lock.
-- **Credential checks before network access.** Login checks the key, the `pass`
-  recipients, including those in the CLI's session folder, and an encrypt and
-  decrypt round trip there before the browser sign-in, so a broken store cannot
-  strand a new session. Each Proton destination run checks the key, its
-  protection, and the recipients.
-- **An explicit subprocess environment.** Proton tools receive only Ankh's
-  selected variables, including a fixed executable path, API host, credential
-  store, encrypted cache, and `pass` options. Unrelated secrets, proxy settings,
-  and TLS overrides are not inherited. Someone who controls Ankh's own startup
-  environment can still control the parent process.
-- **Fixed failure reasons.** Tool output stays out of logs. Known CLI failures,
-  such as a missing or revoked session, are logged as fixed messages that name
-  the fix.
-
-Some limits need manual steps:
-
-- Logging in again does not revoke the previous session; the CLI's logout only
-  deletes local data. Revoke old sessions in the Proton account's security
-  settings.
-- Stopping a container during token refresh can lose the updated session and
-  require another login. Unreadable or duplicate remote names fail closed; future-dated
-  snapshots are excluded from retention and reported without consuming slots.
-- Whoever completes the printed sign-in URL first decides which account Ankh
-  uses, and the URL also carries the key for the session handoff. The login
-  services disable Docker logging; keep the terminal output private as well, and
-  check the account's session list after signing in.
-- The CLI writes its own warning log to `/proton/cache`. It can send crash
-  reports to Proton, and sends metrics when the account has telemetry enabled.
-- The containers run as root with only the `DAC_OVERRIDE` capability, which lets
-  them read bind mounts owned by other users. A non-root user would require
-  changing the ownership of every mount.
+- **Protect credentials and local data.** Treat the Proton state volume as an
+  account credential and mount it only in Ankh containers. Restrict access to
+  secret files, staging directories, and the outbox; staged data and pending
+  archives are plaintext locally.
+- **Use a credential passphrase.** Set `proton-gpg-passphrase` before login, or
+  log in again after adding it. A stolen state volume then also needs the separate
+  passphrase file. This does not protect a compromised host or running container.
+- **Keep login URLs private and revoke old sessions.** Logging in again or
+  deleting local credentials does not revoke a session. Use Proton's security
+  settings, especially when switching away from your main account. If credentials
+  leak, revoke the sessions, change the account password, and recreate the
+  credential volume before logging in again.
+- **Verify recovery.** Test a real restore from every destination before enabling
+  scheduled backups, and keep recovery credentials somewhere separate from the
+  runner.
 
 ## Development
 
