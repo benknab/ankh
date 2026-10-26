@@ -11,6 +11,8 @@ import { output } from "#/testing/commands.ts";
 import { fixture } from "#/testing/fixtures.ts";
 import { outboxInfrastructure } from "#/testing/infrastructure.ts";
 
+const uid = (part: string): string => `${"v".repeat(22)}~${part.repeat(22)}`;
+
 it.live(
   "shared-folder backups retry denied uploads, restore, and retain only their own pairs",
   () =>
@@ -40,11 +42,19 @@ it.live(
       });
       let denyUpload = true;
       let denied = 0;
+      const sharedRoot = `/shared-with-me/Ankh Backups/${uid("r")}`;
+      const target = `${sharedRoot}/${uid("j")}`;
       const local = (file: string): string => {
         expect(
           file.startsWith("/shared-with-me/Ankh Backups/") ||
             file === "/shared-with-me/Ankh Backups",
         ).toBe(true);
+        if (file === target || file.startsWith(`${target}/`)) {
+          return path.join(remote, "test-job", file.slice(target.length));
+        }
+        if (file === sharedRoot) {
+          return remote;
+        }
         return path.join(remote, file.slice("/shared-with-me/Ankh Backups".length));
       };
       const encode = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
@@ -62,8 +72,8 @@ it.live(
                 if (last === "/shared-with-me") {
                   return output(
                     yield* encode([
-                      { name: { ok: true, value: "unrelated.txt" }, type: "file" },
-                      { name: { ok: true, value: "Ankh Backups" }, type: "folder" },
+                      { uid: uid("f"), name: { ok: true, value: "unrelated.txt" }, type: "file" },
+                      { uid: uid("r"), name: { ok: true, value: "Ankh Backups" }, type: "folder" },
                     ]),
                   );
                 }
@@ -72,6 +82,7 @@ it.live(
                   (value) =>
                     fs.stat(path.join(local(last), value)).pipe(
                       Effect.map((stat) => ({
+                        uid: uid(value === "test-job" ? "j" : value === "nested" ? "n" : "f"),
                         name: { ok: true, value },
                         type: stat.type === "Directory" ? "folder" : "file",
                       })),
@@ -81,12 +92,12 @@ it.live(
                 return output(yield* encode(entries));
               }
               case "create-folder": {
-                expect(args).toEqual(["create-folder", "/shared-with-me/Ankh Backups", "test-job"]);
+                expect(args).toEqual(["create-folder", sharedRoot, "test-job"]);
                 yield* fs.makeDirectory(local(destination.remoteFolder));
                 return output("");
               }
               case "upload": {
-                expect(last).toBe(destination.remoteFolder);
+                expect(last).toBe(target);
                 expect(args.slice(1, 4)).toEqual([
                   "--file-conflict-strategy",
                   "create-new-revision",
@@ -104,7 +115,7 @@ it.live(
               case "trash": {
                 expect(args[1]).toBe("--json");
                 for (const file of args.slice(2)) {
-                  expect(file.startsWith(`${destination.remoteFolder}/test-job-2000`)).toBe(true);
+                  expect(file.startsWith(`${target}/test-job-2000`)).toBe(true);
                   yield* fs.remove(local(file));
                 }
                 return output("[]");

@@ -9,7 +9,11 @@ import { output } from "#/testing/commands.ts";
 
 const destination = (remoteFolder: string): Effect.Effect<Proton, Schema.SchemaError> =>
   Schema.decodeEffect(Proton)({ type: "proton-drive", remoteFolder, outbox: "/outbox" });
+const uid = (part: string): string => `${"v".repeat(22)}~${part.repeat(22)}`;
+const rootPath = `/shared-with-me/Ankh Backups/${uid("r")}`;
+const hostPath = `${rootPath}/${uid("h")}`;
 const node = (value: string, type: "folder" | "file" = "folder"): unknown => ({
+  uid: uid(value === "Ankh Backups" ? "r" : value === "host" ? "h" : "j"),
   name: { ok: true, value },
   type,
 });
@@ -29,18 +33,25 @@ it.effect("shared initialization creates only missing descendants of the invited
     const config = yield* destination("/shared-with-me/Ankh Backups/host/job");
     const shared = yield* listing([node("unrelated.txt", "file"), node("Ankh Backups")]);
     const host = yield* listing([node("owner-file.txt", "file"), node("host")]);
+    const job = yield* listing([node("job")]);
+    let created = false;
     const calls: (readonly Argument[])[] = [];
     const commands = Commands.of({
       run: (_binary, args) => {
         const command = args.slice(9);
         calls.push(command);
+        if (command[0] === "create-folder") {
+          created = true;
+        }
         return Effect.succeed(
           output(
             command.at(-1) === "/shared-with-me"
               ? shared
-              : command.at(-1) === "/shared-with-me/Ankh Backups"
+              : command.at(-1) === rootPath
                 ? host
-                : "[]",
+                : created
+                  ? job
+                  : "[]",
           ),
         );
       },
@@ -49,10 +60,11 @@ it.effect("shared initialization creates only missing descendants of the invited
       yield* (yield* ProtonDrive).initialize(config);
     }).pipe(Effect.provide(layer(commands)));
     expect(calls).toEqual([
-      ["list", "--json", "--type", "folder", "/shared-with-me"],
-      ["list", "--json", "--type", "folder", "/shared-with-me/Ankh Backups"],
-      ["list", "--json", "--type", "folder", "/shared-with-me/Ankh Backups/host"],
-      ["create-folder", "/shared-with-me/Ankh Backups/host", "job"],
+      ["list", "--json", "/shared-with-me"],
+      ["list", "--json", rootPath],
+      ["list", "--json", hostPath],
+      ["create-folder", hostPath, "job"],
+      ["list", "--json", hostPath],
     ]);
     calls.length = 0;
     const root = yield* destination("/shared-with-me/Ankh Backups");
@@ -60,7 +72,7 @@ it.effect("shared initialization creates only missing descendants of the invited
       yield* (yield* ProtonDrive).initialize(root);
     }).pipe(Effect.provide(layer(commands)));
     expect(calls, "using the shared root directly must not try to recreate it").toEqual([
-      ["list", "--json", "--type", "folder", "/shared-with-me"],
+      ["list", "--json", "/shared-with-me"],
     ]);
   }),
 );
@@ -82,13 +94,17 @@ it.effect("missing, ambiguous, and unreadable shares block every operation befor
       [[node("Ankh Backups", "file")], "accept its invitation"],
       [[node("Ankh Backups"), node("Ankh Backups")], "duplicate names"],
       [[node("Ankh Backups", "file"), node("Ankh Backups")], "duplicate names"],
-      [[{ name: { ok: false }, type: "folder" }], "Proton listing"],
+      [[{ name: { ok: false }, type: "folder" }], "Proton shared-folder listing"],
+      [
+        [{ name: { ok: true, value: "Ankh Backups" }, type: "folder", uid: "../../escape" }],
+        "Proton shared-folder listing",
+      ],
     ] as const) {
       const text = yield* listing(nodes);
       let calls = 0;
       const commands = Commands.of({
         run: (_binary, args) => {
-          expect(args.slice(9)).toEqual(["list", "--json", "--type", "folder", "/shared-with-me"]);
+          expect(args.slice(9)).toEqual(["list", "--json", "/shared-with-me"]);
           calls += 1;
           return Effect.succeed(output(text));
         },
@@ -152,29 +168,19 @@ it.effect("every shared operation rejects missing or ambiguous descendant folder
       [[node("job", "file")], "destination folder is unavailable"],
       [[node("job"), node("job")], "duplicate names"],
       [[node("job"), node("job", "file")], "duplicate names"],
-      [[{ name: { ok: false }, type: "folder" }], "Proton listing"],
+      [[{ name: { ok: false }, type: "folder" }], "Proton shared-folder listing"],
     ] as const) {
       const children = yield* listing(nodes);
       const calls: (readonly Argument[])[] = [];
       const commands = Commands.of({
         run: (_binary, args) => {
           const command = args.slice(9);
-          expect(command.slice(0, 4)).toEqual(["list", "--json", "--type", "folder"]);
+          expect(command.slice(0, 2)).toEqual(["list", "--json"]);
           const parent = command.at(-1);
-          expect([
-            "/shared-with-me",
-            "/shared-with-me/Ankh Backups",
-            "/shared-with-me/Ankh Backups/host",
-          ]).toContain(parent);
+          expect(["/shared-with-me", rootPath, hostPath]).toContain(parent);
           calls.push(command);
           return Effect.succeed(
-            output(
-              parent === "/shared-with-me"
-                ? shared
-                : parent === "/shared-with-me/Ankh Backups"
-                  ? host
-                  : children,
-            ),
+            output(parent === "/shared-with-me" ? shared : parent === rootPath ? host : children),
           );
         },
       });
@@ -212,4 +218,44 @@ it.effect("shared listing failures preserve the error and never create a replace
     expect(calls).toHaveLength(1);
     expect(Array.some(calls, (args) => args.includes("create-folder"))).toBe(false);
   }),
+);
+
+it.effect(
+  "upload and confirmation keep the selected folder identity when its name is replaced",
+  () =>
+    Effect.gen(function* () {
+      const config = yield* destination("/shared-with-me/Ankh Backups");
+      const job = yield* Schema.decodeEffect(JobName)("test-job");
+      const name = archiveName(job, DateTime.makeUnsafe("2026-01-01T00:00:00Z"));
+      const shared = yield* listing([node("Ankh Backups")]);
+      const uploaded = yield* listing([node(name, "file"), node(`${name}.sha256`, "file")]);
+      let replaced = false;
+      let rootListings = 0;
+      const commands = Commands.of({
+        run: (_binary, args) => {
+          if (args.at(-1) === "/shared-with-me") {
+            rootListings += 1;
+            return Effect.succeed(output(shared));
+          }
+          // A second folder can now have the old name. Name-only paths would target it.
+          expect(args.at(-1)).toBe(rootPath);
+          if (args.includes("upload")) {
+            replaced = true;
+            return Effect.succeed(output(""));
+          }
+          expect(replaced, "confirmation must follow the upload").toBe(true);
+          return Effect.succeed(output(uploaded));
+        },
+      });
+      yield* Effect.gen(function* () {
+        yield* (yield* ProtonDrive).upload(config, {
+          name,
+          directory: absolutePath("/outbox/pair"),
+          file: absolutePath(`/outbox/pair/${name}`),
+          checksum: absolutePath(`/outbox/pair/${name}.sha256`),
+        });
+      }).pipe(Effect.provide(layer(commands)));
+      expect(replaced).toBe(true);
+      expect(rootListings, "confirmation must not resolve the name again").toBe(1);
+    }),
 );

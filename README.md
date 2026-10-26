@@ -158,8 +158,10 @@ quota ([Proton's sharing documentation](https://proton.me/support/drive-how-to-s
 
 Ankh requires the invited root to exist and creates missing subfolders beneath it.
 You can also target `/shared-with-me/Ankh Backups` directly. Missing or revoked
-shares, unreadable names, and duplicate names in the shared-root listing fail
-closed; Ankh never substitutes a folder in the backup account's own Drive.
+shares, unreadable names, and duplicate names along the destination path fail
+closed. Each operation resolves shared folders to validated node IDs, then uses
+those IDs for its writes and confirmation rather than resolving folder names
+again. Ankh never substitutes a folder in the backup account's own Drive.
 Uploads that fail remain in the local outbox for `retry`.
 
 The backup account can read, modify, and trash files in the shared folder. This

@@ -1,4 +1,4 @@
-import { Array, Context, Effect, HashSet, Layer, Redacted, Schema } from "effect";
+import { Array, Context, Effect, HashMap, HashSet, Layer, Redacted, Schema } from "effect";
 import { backupError, BackupError } from "#/domain/model.ts";
 import { Commands } from "#/process/commands.ts";
 import { runProton } from "#/clients/proton/command.ts";
@@ -16,11 +16,44 @@ const Folders = Schema.fromJsonString(
 const SharedNodes = Schema.fromJsonString(
   Schema.Array(Schema.Struct({ name: Name, type: Schema.Literals(["file", "folder"]) })),
 );
+// Match the node-UID syntax recognized by the pinned CLI's path resolver.
+const NodeUid = Schema.String.check(
+  Schema.isPattern(
+    /^([a-zA-Z0-9=_-]{88,108}|[a-zA-Z0-9_-]{22})~([a-zA-Z0-9=_-]{88,108}|[a-zA-Z0-9_-]{22})$/u,
+  ),
+).pipe(Schema.brand("ProtonNodeUid"));
+const SharedNode = Schema.Struct({
+  uid: NodeUid,
+  name: Name,
+  type: Schema.Literals(["file", "folder"]),
+});
+export type SharedNode = typeof SharedNode.Type;
+const SharedIdentities = Schema.fromJsonString(Schema.Array(SharedNode));
+
+const sharedNodes = Effect.fn("ProtonCli.sharedNodes")(
+  function* (folder: string) {
+    const result = yield* runProton("proton-drive", ["filesystem", "list", "--json", folder]);
+    const nodes = yield* Schema.decodeEffect(SharedIdentities)(Redacted.value(result.stdout));
+    const byName = HashMap.fromIterable(
+      Array.map(nodes, (node) => [node.name.value, node] as const),
+    );
+    if (HashMap.size(byName) !== nodes.length) {
+      return yield* BackupError.make({
+        message: "Proton listing contains duplicate names; resolve them before retrying",
+      });
+    }
+    return byName;
+  },
+  Effect.mapError(backupError("Proton shared-folder listing")),
+);
 
 export class ProtonCli extends Context.Service<
   ProtonCli,
   {
     readonly verify: Effect.Effect<void, BackupError>;
+    readonly sharedNodes: (
+      folder: string,
+    ) => Effect.Effect<HashMap.HashMap<string, SharedNode>, BackupError>;
     readonly list: (
       folder: string,
       type: "file" | "folder",
@@ -62,6 +95,7 @@ export class ProtonCli extends Context.Service<
       );
       return ProtonCli.of({
         verify: verifyCredentials().pipe(Effect.provide(context)),
+        sharedNodes: (folder) => sharedNodes(folder).pipe(Effect.provide(context)),
         list,
         createFolder: (parent, name) => run(["create-folder", parent, name]).pipe(Effect.asVoid),
         upload: (folder, files) =>

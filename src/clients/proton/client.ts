@@ -2,44 +2,24 @@ import { Array, Context, Effect, HashSet, Layer } from "effect";
 import { type ArchiveName, BackupError, type Proton, type RemoteFolder } from "#/domain/model.ts";
 import type { Archive } from "#/domain/archive.ts";
 import { ProtonCli } from "#/clients/proton/cli.ts";
+import { resolveSharedFolder, type SharedFolderPath } from "#/clients/proton/shared.ts";
 
 type Folder = Pick<Proton, "remoteFolder">;
+type Target = RemoteFolder | SharedFolderPath;
 
-const rootFolder = Effect.fn("ProtonDrive.rootFolder")(function* (
-  cli: ProtonCli["Service"],
-  folder: RemoteFolder,
-) {
-  const root = folder.startsWith("/my-files/")
-    ? "/my-files"
-    : Array.join(folder.split("/").slice(0, 3), "/");
-  if (root !== "/my-files") {
-    const folders = yield* cli.list("/shared-with-me", "folder");
-    if (!HashSet.has(folders, root.slice("/shared-with-me/".length))) {
-      return yield* BackupError.make({
-        message:
-          "Proton shared folder is unavailable; accept its invitation with the backup account and check remoteFolder and Editor access",
-      });
-    }
-  }
-  return root;
-});
-
-// The CLI takes the first matching name at every level, not just the shared root.
-const prepareFolder = Effect.fn("ProtonDrive.prepareFolder")(function* (
+const initialize = Effect.fn("ProtonDrive.initialize")(function* (
   cli: ProtonCli["Service"],
   destination: Folder,
-  createMissing: boolean,
 ) {
-  let parent = yield* rootFolder(cli, destination.remoteFolder);
+  if (destination.remoteFolder.startsWith("/shared-with-me/")) {
+    yield* resolveSharedFolder(cli, destination.remoteFolder, true);
+    return;
+  }
+  let parent = "/my-files";
   const names = destination.remoteFolder.slice(parent.length + 1);
   for (const name of names === "" ? [] : names.split("/")) {
     const folders = yield* cli.list(parent, "folder");
     if (!HashSet.has(folders, name)) {
-      if (!createMissing) {
-        return yield* BackupError.make({
-          message: "Proton destination folder is unavailable; check remoteFolder and run init",
-        });
-      }
       yield* cli.createFolder(parent, name);
     }
     parent = `${parent}/${name}`;
@@ -50,21 +30,21 @@ const prepareFolder = Effect.fn("ProtonDrive.prepareFolder")(function* (
 const withFolder = Effect.fn("ProtonDrive.withFolder")(function* <A>(
   cli: ProtonCli["Service"],
   destination: Folder,
-  operation: Effect.Effect<A, BackupError>,
+  operation: (folder: Target) => Effect.Effect<A, BackupError>,
 ) {
-  if (destination.remoteFolder.startsWith("/shared-with-me/")) {
-    yield* prepareFolder(cli, destination, false);
-  }
-  return yield* operation;
+  const folder = destination.remoteFolder.startsWith("/shared-with-me/")
+    ? yield* resolveSharedFolder(cli, destination.remoteFolder, false)
+    : destination.remoteFolder;
+  return yield* operation(folder);
 });
 
 const upload = Effect.fn("ProtonDrive.upload")(function* (
   cli: ProtonCli["Service"],
-  destination: Folder,
+  folder: Target,
   archive: Archive,
 ) {
-  yield* cli.upload(destination.remoteFolder, [archive.file, archive.checksum]);
-  const names = yield* cli.list(destination.remoteFolder, "file");
+  yield* cli.upload(folder, [archive.file, archive.checksum]);
+  const names = yield* cli.list(folder, "file");
   if (!HashSet.has(names, archive.name) || !HashSet.has(names, `${archive.name}.sha256`)) {
     return yield* BackupError.make({
       message: `Proton did not confirm archive pair ${archive.name}`,
@@ -74,32 +54,32 @@ const upload = Effect.fn("ProtonDrive.upload")(function* (
 
 const trashBatch = Effect.fn("ProtonDrive.trashBatch")(function* (
   cli: ProtonCli["Service"],
-  destination: Folder,
+  folder: Target,
   pending: readonly string[],
 ) {
   if (pending.length > 0) {
-    yield* cli.trash(Array.map(pending, (file) => `${destination.remoteFolder}/${file}`));
+    yield* cli.trash(Array.map(pending, (file) => `${folder}/${file}`));
   }
 });
 
 const trash = Effect.fn("ProtonDrive.trash")(function* (
   cli: ProtonCli["Service"],
-  destination: Folder,
+  folder: Target,
   names: HashSet.HashSet<ArchiveName>,
 ) {
   if (HashSet.size(names) === 0) {
     return;
   }
-  const existing = yield* cli.list(destination.remoteFolder, "file");
+  const existing = yield* cli.list(folder, "file");
   // Bound command arguments while sharing folder listings across the whole retention intent.
   for (const batch of Array.chunksOf(Array.fromIterable(names), 50)) {
     const pending = Array.filter(
       Array.flatMap(batch, (name) => [name, `${name}.sha256`]),
       (file) => HashSet.has(existing, file),
     );
-    yield* trashBatch(cli, destination, pending);
+    yield* trashBatch(cli, folder, pending);
   }
-  const remaining = yield* cli.list(destination.remoteFolder, "file");
+  const remaining = yield* cli.list(folder, "file");
   for (const name of names) {
     if (HashSet.has(remaining, name) || HashSet.has(remaining, `${name}.sha256`)) {
       return yield* BackupError.make({ message: `Proton did not confirm trashing ${name}` });
@@ -126,12 +106,12 @@ export class ProtonDrive extends Context.Service<
       const cli = yield* ProtonCli;
       return ProtonDrive.of({
         verify: cli.verify,
-        initialize: (destination) => prepareFolder(cli, destination, true),
-        list: (destination) =>
-          withFolder(cli, destination, cli.list(destination.remoteFolder, "file")),
+        initialize: (destination) => initialize(cli, destination),
+        list: (destination) => withFolder(cli, destination, (folder) => cli.list(folder, "file")),
         upload: (destination, archive) =>
-          withFolder(cli, destination, upload(cli, destination, archive)),
-        trash: (destination, names) => withFolder(cli, destination, trash(cli, destination, names)),
+          withFolder(cli, destination, (folder) => upload(cli, folder, archive)),
+        trash: (destination, names) =>
+          withFolder(cli, destination, (folder) => trash(cli, folder, names)),
       });
     }),
   ).pipe(Layer.provide(ProtonCli.layer));
